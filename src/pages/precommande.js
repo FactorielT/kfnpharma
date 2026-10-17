@@ -41,14 +41,15 @@ module.exports = async ctx => {
     });
     const b = await WA.surPrecommande(n, ctx.uname()).catch(err => { console.error(err); return null; });
     ctx.flash(`Pré-commande ${n} envoyée au siège. Elle apparaîtra dans « Approvisionnements » une fois validée.` + WA.resume(b));
-    ctx.redirect('?p=precommande');
+    ctx.redirect('?p=precommande&fiche=' + encodeURIComponent(n));
   }
   const ags = ctx.agences, inn = ags.map(() => '?').join(',');
   const editCode = ctx.get('edit') && ctx.canEdit() ? ctx.get('edit') : '';
   const editL = editCode ? await C.rows(`SELECT * FROM t_precommandeagence WHERE idcmde = ? AND statut = 'EN_ATTENTE' AND structures IN (${inn}) ORDER BY idprecommandeagence`, [editCode, ...ags]) : [];
   const enCours = await C.rows(`SELECT idcmde, structures, MIN(dateenreg) d, COUNT(*) n, SUM(totalvente) t, statut FROM t_precommandeagence
     WHERE structures IN (${inn}) AND statut IN ('EN_ATTENTE','VALIDE_SIEGE') GROUP BY idcmde, structures, statut ORDER BY d DESC LIMIT 30`, ags);
-  return `<h1 class="page-title" style="background:#111;color:#FFE600;font-style:italic">Simulation de commande ou pré-approvisionnement chez KFN Siège</h1>
+  const fiche = ctx.get('fiche');
+  return `${fiche ? `<div class="flash info" style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap">Fiche de la pré-commande <b>${e(fiche)}</b> prête. <a class="btn green" target="_blank" href="/gestion/print?t=fichepre&n=${encodeURIComponent(fiche)}">Imprimer la fiche</a></div>` : ''}<h1 class="page-title" style="background:#111;color:#FFE600;font-style:italic">Simulation de commande ou pré-approvisionnement chez KFN Siège</h1>
 <form method="post" class="card" id="fp">${ctx.csrfField()}<input type="hidden" name="lignes" id="lignes">
   <div class="grid g4"><div class="f"><label>Date appro</label><input value="${C.dfr(C.today())}" readonly></div>
   <div class="f span2"><label>Agence</label><select name="agence" id="agence" required>${ctx.agOptions(ctx.isSiege() ? null : ctx.ustruct(), ctx.isSiege(), true)}</select></div>

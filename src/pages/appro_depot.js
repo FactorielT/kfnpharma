@@ -3,7 +3,7 @@ const C = require('../core'); const { e, num } = C;
 module.exports = async ctx => {
   ctx.title = 'Approvisionnement du dépôt principal';
   if (ctx.req.method === 'POST' && ctx.post('annuler')) {
-    ctx.requireEdit('?p=appro_depot');
+    if (!ctx.isSuper()) { ctx.flash('Seul le Super Admin peut annuler un approvisionnement.', 'err'); ctx.redirect('?p=appro_depot'); }
     const n = ctx.post('annuler');
     const r = await C.tx(async () => {
       const l = await C.rows('SELECT * FROM t_appro WHERE numappro = ? AND structures = ?', [n, C.SIEGE]);
@@ -56,7 +56,7 @@ ${pr ? `<div class="flash info">Bon d'approvisionnement : <a href="/gestion/prin
   <div class="tbl-wrap"><table class="tbl" id="grid"><thead></thead><tbody></tbody><tfoot><tr><td colspan="5">Total</td><td class="r" id="tot">0</td></tr></tfoot></table></div>
   <div class="actions"><button class="btn" style="background:#0000E6">Enregistrer</button></div></form>
 <div class="card"><h2>Derniers approvisionnements du dépôt principal</h2><div class="tbl-wrap"><table class="tbl grey"><thead><tr><th>N° appro</th><th>Date</th><th>Fournisseur</th><th class="r">Lignes</th><th class="r">Montant</th><th></th></tr></thead><tbody>
-${recents.map(a => `<tr><td>${e(a.numappro)}</td><td>${C.dfr(a.d)}</td><td>${e(a.f)}</td><td class="r">${a.n}</td><td class="r">${C.money(a.t)}</td><td class="r" style="white-space:nowrap"><a class="btn sm ghost" target="_blank" href="/gestion/print?t=appro&n=${encodeURIComponent(a.numappro)}">Bon</a>${ctx.canEdit() ? ` <form method="post" style="display:inline" data-confirm="delete">${ctx.csrfField()}<button class="btn sm red" name="annuler" value="${e(a.numappro)}">Annuler</button></form>` : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">Aucun approvisionnement.</td></tr>'}</tbody></table></div></div>
+${recents.map(a => `<tr><td>${e(a.numappro)}</td><td>${C.dfr(a.d)}</td><td>${e(a.f)}</td><td class="r">${a.n}</td><td class="r">${C.money(a.t)}</td><td class="r" style="white-space:nowrap"><a class="btn sm ghost" target="_blank" href="/gestion/print?t=appro&n=${encodeURIComponent(a.numappro)}">Bon</a>${ctx.isSuper() ? ` <form method="post" style="display:inline" data-confirm="delete">${ctx.csrfField()}<button class="btn sm red" name="annuler" value="${e(a.numappro)}">Annuler</button></form>` : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">Aucun approvisionnement.</td></tr>'}</tbody></table></div></div>
 <script>
 (function(){
   var cur=null, g=new KFN.Lines(document.getElementById('grid'),{input:document.getElementById('lignes'),key:'ref',

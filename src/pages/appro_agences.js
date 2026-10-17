@@ -26,9 +26,11 @@ module.exports = async ctx => {
     });
     const b = await WA.surValidation(code, ctx.uname()).catch(err => { console.error(err); return null; });
     ctx.flash(`Pré-commande ${code} validée : ${r.servies} ligne(s) servie(s) et retirée(s) du stock du siège. L'agence ${r.ag} doit maintenant confirmer la réception.` + (r.manque.length ? ' Quantité réduite au stock disponible pour : ' + r.manque.join(', ') + '.' : '') + WA.resume(b));
-    ctx.redirect('?p=appro_agences');
+    ctx.redirect('?p=appro_agences&fiche=' + encodeURIComponent(code));
   }
+  const fiche = ctx.get('fiche');
   return `<h1 class="page-title">Approvisionnement des produits par agences</h1>
+${fiche ? `<div class="flash info" style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap">Fiche de validation de la pré-commande <b>${C.e(fiche)}</b> prête. <a class="btn green" target="_blank" href="/gestion/print?t=validation&n=${encodeURIComponent(fiche)}">Imprimer la fiche</a></div>` : ''}
 <form method="post" class="card" id="fv">${ctx.csrfField()}<input type="hidden" name="lignes" id="lignes"><input type="hidden" name="code" id="code">
   <div class="row"><div class="f" style="max-width:160px"><label>Date appro</label><input value="${C.dfr(C.today())}" readonly style="color:#B42318;font-weight:800"></div>
   <div class="f"><label>Agence</label><select id="agence">${ctx.agOptions(null, true, true)}</select></div><button type="button" class="btn maroon" id="aff">Afficher</button></div>

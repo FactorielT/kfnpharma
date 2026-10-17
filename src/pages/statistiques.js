@@ -15,28 +15,29 @@ module.exports = async ctx => {
   if (mode === 'annee' && an === Number(td.slice(0, 4))) { d2 = td; p2 = (an - 1) + td.slice(4); egal = true; }
   if (mode === 'mois' && d1.slice(0, 7) === td.slice(0, 7)) { d2 = td; p2 = p1.slice(0, 8) + C.pad(Math.min(Number(td.slice(8, 10)), Number(p2.slice(8, 10)))); egal = true; }
   const crit = CRIT[ctx.get('crit')] ? ctx.get('crit') : 'ca', key = { ca: 'ca', encaisse: 'enc', factures: 'nb', qte: 'qte' }[crit];
-  const agences = (await C.rows('SELECT nom_structure FROM t_structure ORDER BY estsiege DESC, nom_structure')).map(r => r.nom_structure);
+  // Siège : toutes les agences ; agence : uniquement la sienne
+  const agences = ctx.agences;
   const ventes = async (a, b) => {
     const o = {};
-    for (const r of await C.rows('SELECT structures ag, COUNT(*) nb, COALESCE(SUM(mtapayer),0) ca, COALESCE(SUM(verse),0) enc, COALESCE(SUM(reste),0) reste FROM t_commande WHERE datecmde BETWEEN ? AND ? GROUP BY structures', [a, b])) o[r.ag] = r;
-    for (const r of await C.rows('SELECT structures ag, COALESCE(SUM(qte),0) q FROM t_lignecmde WHERE dateenreg BETWEEN ? AND ? GROUP BY structures', [a, b])) (o[r.ag] ||= {}).qte = r.q;
+    for (const r of await C.rows('SELECT structures ag, COUNT(*) nb, COALESCE(SUM(mtapayer),0) ca, COALESCE(SUM(verse),0) enc, COALESCE(SUM(reste),0) reste FROM t_commande WHERE datecmde BETWEEN ? AND ? AND structures = ANY(?) GROUP BY structures', [a, b, agences])) o[r.ag] = r;
+    for (const r of await C.rows('SELECT structures ag, COALESCE(SUM(qte),0) q FROM t_lignecmde WHERE dateenreg BETWEEN ? AND ? AND structures = ANY(?) GROUP BY structures', [a, b, agences])) (o[r.ag] ||= {}).qte = r.q;
     return o;
   };
   const cur = await ventes(d1, d2), prev = await ventes(p1, p2), obj = {}, top = {};
-  if (mode === 'annee') for (const r of await C.rows('SELECT structures, montant FROM objectif WHERE annee = ?', [String(an)])) obj[r.structures] = Number(r.montant);
-  for (const r of await C.rows('SELECT structures ag, libarticles lib, SUM(mtapayer) t FROM t_lignecmde WHERE dateenreg BETWEEN ? AND ? GROUP BY structures, libarticles ORDER BY t DESC', [d1, d2])) if (!top[r.ag]) top[r.ag] = r.lib;
+  if (mode === 'annee') for (const r of await C.rows('SELECT structures, montant FROM objectif WHERE annee = ? AND structures = ANY(?)', [String(an), agences])) obj[r.structures] = Number(r.montant);
+  for (const r of await C.rows('SELECT structures ag, libarticles lib, SUM(mtapayer) t FROM t_lignecmde WHERE dateenreg BETWEEN ? AND ? AND structures = ANY(?) GROUP BY structures, libarticles ORDER BY t DESC', [d1, d2, agences])) if (!top[r.ag]) top[r.ag] = r.lib;
   const L = agences.map(a => { const c = cur[a] || {}, p = prev[a] || {}; const l = { ag: a, nb: Number(c.nb || 0), qte: Number(c.qte || 0), ca: Number(c.ca || 0), enc: Number(c.enc || 0), reste: Number(c.reste || 0), prev: Number(p.ca || 0), obj: obj[a] || 0, top: top[a] || '—' };
     l.panier = l.nb ? Math.round(l.ca / l.nb) : 0; l.evol = l.prev > 0 ? (l.ca - l.prev) / l.prev * 100 : null; return l; })
     .sort((x, y) => (y[key] - x[key]) || (y.ca - x.ca));
   const T = { nb: 0, qte: 0, ca: 0, enc: 0, reste: 0, prev: 0, obj: 0 }; for (const l of L) for (const k in T) T[k] += l[k];
   const act = L.filter(l => l.nb > 0);
   const anG = mode === 'periode' ? Number(d2.slice(0, 4)) : an, mens = {};
-  for (const r of await C.rows('SELECT structures ag, EXTRACT(MONTH FROM datecmde)::int m, SUM(mtapayer) ca FROM t_commande WHERE EXTRACT(YEAR FROM datecmde) = ? GROUP BY structures, EXTRACT(MONTH FROM datecmde)', [anG])) (mens[r.ag] ||= {})[r.m] = Number(r.ca);
-  const annees = (await C.rows('SELECT DISTINCT EXTRACT(YEAR FROM datecmde)::int a FROM t_commande WHERE datecmde IS NOT NULL ORDER BY a DESC')).map(r => r.a);
+  for (const r of await C.rows('SELECT structures ag, EXTRACT(MONTH FROM datecmde)::int m, SUM(mtapayer) ca FROM t_commande WHERE EXTRACT(YEAR FROM datecmde) = ? AND structures = ANY(?) GROUP BY structures, EXTRACT(MONTH FROM datecmde)', [anG, agences])) (mens[r.ag] ||= {})[r.m] = Number(r.ca);
+  const annees = (await C.rows('SELECT DISTINCT EXTRACT(YEAR FROM datecmde)::int a FROM t_commande WHERE datecmde IS NOT NULL AND structures = ANY(?) ORDER BY a DESC', [agences])).map(r => r.a);
   if (!annees.includes(an)) annees.push(an); annees.sort((a, b) => b - a);
   const lib = mode === 'annee' ? `Année ${an}` : (mode === 'mois' ? `${C.MOIS[mo]} ${an}` : `Du ${C.dfr(d1)} au ${C.dfr(d2)}`);
   const med = ['🥇', '🥈', '🥉'], maxv = L[0]?.[key] || 0;
-  return `<h1 class="page-title">Statistique de vente par agence</h1>
+  return `<h1 class="page-title">Statistique de vente ${ctx.isSiege() ? 'par agence' : '— ' + e(ctx.ustruct())}</h1>
 <div class="card no-print"><form method="get" action="/gestion" class="row"><input type="hidden" name="p" value="statistiques">
   <div class="f"><label>Période</label><select name="mode" id="mode"><option value="annee"${mode === 'annee' ? ' selected' : ''}>Sur l'année</option><option value="mois"${mode === 'mois' ? ' selected' : ''}>Sur un mois</option><option value="periode"${mode === 'periode' ? ' selected' : ''}>Période donnée (date début / date fin)</option></select></div>
   <div class="f m-an"><label>Année</label><select name="an">${annees.map(a => `<option${a === an ? ' selected' : ''}>${a}</option>`).join('')}</select></div>

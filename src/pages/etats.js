@@ -3,8 +3,12 @@
 const C = require('../core'); const { e, money, qty } = C;
 const DT = c => `to_char(${c},'DD/MM/YYYY')`;
 const R = {
-  ventes_jour: ['Bilans des ventes du jour', ['dates'], f => [`SELECT numcmde AS "N° commande", nomprenom AS "Client", ${DT('datecmde')} AS "Date cmde", qtetotal AS "Quantités total", mttotal AS "Montant total", remise AS "Remise", mtapayer AS "Montant après remise", verse AS "Payé", reste AS "Reste", utilisateur AS "Agent"
-    FROM t_commande WHERE structures = ? AND datecmde BETWEEN ? AND ? ORDER BY datecmde DESC, idcommande DESC`, [f.ag, f.d1, f.d2]], 'facture'],
+  ventes_jour: ['Bilans des ventes du jour', ['dates', 'filtres'], f => [`SELECT numcmde AS "N° commande", nomprenom AS "Client", ${DT('datecmde')} AS "Date cmde", qtetotal AS "Quantités total", mttotal AS "Montant total", remise AS "Remise", mtapayer AS "Montant après remise", verse AS "Payé", reste AS "Reste",
+      CASE WHEN reste <= 0 THEN 'Soldée' WHEN verse > 0 THEN 'Partielle' ELSE 'Non payée' END AS "État", utilisateur AS "Agent"
+    FROM t_commande WHERE structures = ? AND datecmde BETWEEN ? AND ?
+      AND (?::text = '' OR nomprenom = ?) AND (?::text = '' OR numcmde IN (SELECT idcmde FROM t_lignecmde WHERE libarticles = ?))
+      AND (?::text = '' OR (? = 'soldee' AND reste <= 0) OR (? = 'credit' AND reste > 0))
+    ORDER BY datecmde DESC, idcommande DESC`, [f.ag, f.d1, f.d2, f.cl, f.cl, f.prod, f.prod, f.etat, f.etat, f.etat]], 'facture'],
   credits: ['Bilans crédits', [], f => [`SELECT nomprenom AS "Nom client", SUM(mtapayer) AS "Montant commande", SUM(verse) AS "Montant payé", SUM(reste) AS "Reste"
     FROM t_commande WHERE structures = ? AND reste > 0 GROUP BY nomprenom ORDER BY SUM(reste) DESC`, [f.ag]]],
   credits_periode: ['Bilans sur période crédits', ['dates'], f => [`SELECT numcmde AS "N° commande", nomprenom AS "Nom client", mtapayer AS "Montant commande", verse AS "Payé", reste AS "Reste", ${DT('datecmde')} AS "Date cmde"
@@ -46,8 +50,9 @@ module.exports = async ctx => {
   const [title, filters, build, link] = R[r];
   ctx.title = title;
   const ag = ctx.agenceOk(ctx.get('agence'));
-  const f = { ag, cl: ctx.get('client'), d1: ctx.get('d1') || (['ventes_jour', 'paiements'].includes(r) ? C.today() : C.today().slice(0, 8) + '01'), d2: ctx.get('d2') || C.today() };
-  const needClient = filters.includes('client'), hasDates = filters.includes('dates');
+  const f = { ag, cl: ctx.get('client'), prod: ctx.get('produit'), etat: ctx.get('etat'), d1: ctx.get('d1') || (['ventes_jour', 'paiements'].includes(r) ? C.today() : C.today().slice(0, 8) + '01'), d2: ctx.get('d2') || C.today() };
+  const needClient = filters.includes('client'), hasDates = filters.includes('dates'), hasFiltres = filters.includes('filtres');
+  const produits = hasFiltres ? (await C.rows('SELECT DISTINCT libarticles FROM t_lignecmde WHERE structures = ? ORDER BY libarticles', [ag])).map(x => x.libarticles) : [];
   const clients = (await C.rows('SELECT DISTINCT nomprenom FROM t_commande WHERE structures = ? ORDER BY nomprenom', [ag])).map(x => x.nomprenom);
   const data = (needClient && !f.cl) ? [] : await C.rows(...build(f));
   const cols = data.length ? Object.keys(data[0]).filter(c => !c.startsWith('_')) : [];
@@ -60,6 +65,9 @@ module.exports = async ctx => {
 <div class="card no-print"><form method="get" action="/gestion" class="row"><input type="hidden" name="p" value="etats"><input type="hidden" name="r" value="${e(r)}">
   <div class="f"><label>Agence</label><select name="agence">${ctx.agOptions(ag)}</select></div>
   ${needClient ? `<div class="f"><label>${lc}</label><select name="client">${C.selOptions(clients, f.cl, true, '— ' + lc + ' —')}</select></div>` : ''}
+  ${hasFiltres ? `<div class="f"><label>${lc}</label><select name="client">${C.selOptions(clients, f.cl, true, 'Tous')}</select></div>
+    <div class="f"><label>Produit</label><select name="produit">${C.selOptions(produits, f.prod, true, 'Tous les produits')}</select></div>
+    <div class="f"><label>État</label><select name="etat">${C.selOptions({ soldee: 'Soldées', credit: 'Avec reste à payer' }, f.etat, true, 'Toutes')}</select></div>` : ''}
   ${hasDates ? `<div class="f"><label>Date début</label><input type="date" name="d1" value="${e(f.d1)}"></div><div class="f"><label>Date fin</label><input type="date" name="d2" value="${e(f.d2)}"></div>` : ''}
   <button class="btn" style="background:#0000C8">Afficher</button><button type="button" class="btn green" data-print>Imprimer</button><button type="button" class="btn ghost" data-export="#te" data-name="${e(r)}">Exporter (Excel)</button></form></div>
 <div class="card"><p class="hint" style="margin-top:0">KFN PHARMA — <b>${e(ag)}</b>${needClient && f.cl ? ' — ' + lc.toLowerCase() + ' : <b>' + e(f.cl) + '</b>' : ''}${hasDates ? ' — du ' + C.dfr(f.d1) + ' au ' + C.dfr(f.d2) : ''} — édité le ${C.dfr(C.today())}</p>

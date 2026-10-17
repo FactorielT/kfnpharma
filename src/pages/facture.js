@@ -6,13 +6,19 @@ module.exports = async ctx => {
     const ag = ctx.agenceOk(ctx.post('agence')), client = ctx.post('client');
     let lines = []; try { lines = JSON.parse(ctx.post('lignes', '[]')); } catch {}
     if (!client || !lines.length) { ctx.flash('Choisissez le client et ajoutez au moins un article.', 'err'); ctx.redirect('?p=facture'); }
-    if (ag === C.SIEGE && !await V.estAgenceCliente(client)) { ctx.flash('Au siège, le client doit être une agence.', 'err'); ctx.redirect('?p=facture&agence=' + encodeURIComponent(ag)); }
+    if (ag === C.SIEGE) { ctx.flash("Le siège ne vend pas aux agences : elles s'approvisionnent par les pré-commandes.", 'err'); ctx.redirect('?p=facture&agence=' + encodeURIComponent(ag)); }
     const t = ctx.post('type') === 'proforma' ? 'proforma' : 'facture';
     const n = await C.tx(() => t === 'proforma' ? V.saveProforma(ctx, ag, client, lines) : V.saveFacture(ctx, ag, client, lines));
-    ctx.flash((t === 'facture' ? 'Facture ' : 'Pro-forma ') + n + ' enregistrée.' + (t === 'facture' ? (ag === C.SIEGE ? ` Les articles sont transférés dans le stock de ${client}, qui règle à la caisse du siège.` : ' Le client peut passer à la caisse.') : ''));
+    ctx.flash((t === 'facture' ? 'Facture ' : 'Pro-forma ') + n + ' enregistrée.' + (t === 'facture' ?  ' Le client peut passer à la caisse.' : ''));
     ctx.redirect(`?p=facture&agence=${encodeURIComponent(ag)}&done=${encodeURIComponent(n)}&t=${t}`);
   }
   const ag = ctx.agenceOk(ctx.get('agence')), done = ctx.get('done');
+  if (ag === C.SIEGE) return `<h1 class="page-title">Édition de facture</h1>
+<div class="card"><div class="flash info" style="margin:0 0 1rem">Le <b>siège ne vend pas aux agences</b>. Les agences s'approvisionnent par les <b>pré-commandes</b> :
+une pré-commande validée par le siège puis acceptée par l'agence devient une facture d'approvisionnement, c'est-à-dire un <b>impayé de l'agence</b>,
+réglé dans <b>Compte des agences (clientes du siège)</b>, avec le détail des versements, le solde et le reste.</div>
+<div class="actions" style="justify-content:flex-start"><a class="btn orange" href="/gestion?p=compte_agences">Ouvrir le compte des agences</a><a class="btn" href="/gestion?p=appro_agences">Approvisionnement des agences</a>
+<form method="get" action="/gestion" class="row" style="margin-left:auto"><input type="hidden" name="p" value="facture"><select name="agence" data-autosubmit>${ctx.agOptions(ag)}</select></form></div></div>`;
   return `<h1 class="page-title">Édition de facture</h1>
 ${done ? `<div class="flash info"><a class="btn sm green" href="/gestion/print?t=${e(ctx.get('t'))}&n=${encodeURIComponent(done)}" target="_blank">Imprimer ${e(done)}</a></div>` : ''}
 <form method="post" class="card" id="ff">${ctx.csrfField()}<input type="hidden" name="lignes" id="lignes">
@@ -28,7 +34,6 @@ ${done ? `<div class="flash info"><a class="btn sm green" href="/gestion/print?t
   <div class="f"><label>Montant total</label><input id="mt" readonly class="num" value="0"></div><div class="f"><label>Remise</label><input id="rem" class="num" inputmode="numeric" value="0"></div>
   <div class="f"><label>Montant après remise</label><input id="net" readonly class="num" value="0"></div>
   <div class="f" style="display:flex;align-items:flex-end"><button type="button" class="btn block" id="add">Ajouter +</button></div></div>
-  <p class="hint" id="siegeinfo" hidden><b>Vente du siège :</b> le client est obligatoirement une agence. Les articles facturés sont transférés du stock du siège vers le stock de l'agence, qui règle à la caisse du siège.</p>
   <div class="grid-tools"><button type="button" class="btn sm red" id="rm">− Retirer la ligne</button></div>
   <div class="tbl-wrap"><table class="tbl" id="grid"><thead></thead><tbody></tbody></table></div>
   <div class="row" style="justify-content:center;margin-top:1rem"><div class="f" style="max-width:300px"><label>Total facture</label><input id="tot" class="total-box" readonly value="0"></div></div>
@@ -42,11 +47,11 @@ ${done ? `<div class="flash info"><a class="btn sm green" href="/gestion/print?t
   var SIEGE=${JSON.stringify(C.SIEGE)};function v(id){return document.getElementById(id);}var cur=null;
   var g=new KFN.Lines(v('grid'),{input:v('lignes'),cols:[{k:'ref',label:'Référence'},{k:'lib',label:'Articles'},{k:'qte',label:'Quantités',cls:'r',fmt:KFN.fmt},{k:'unite',label:'Unité valeur'},{k:'pv',label:'Prix vente',cls:'r',fmt:KFN.fmt},{k:'total',label:'Total',cls:'r',fmt:KFN.fmt},{k:'remise',label:'Remise',cls:'r',fmt:KFN.fmt},{k:'net',label:'Montant après remise',cls:'r',fmt:KFN.fmt}],
     onChange:function(r){v('tot').value=KFN.fmt(r.reduce(function(s,x){return s+x.net;},0));}});
-  function loadClients(sel){var s=v('agence').value===SIEGE;v('newc').style.visibility=s?'hidden':'';v('siegeinfo').hidden=!s;v('lcl').textContent=s?'Agence cliente':'Client';
+  function loadClients(sel){var s=v('agence').value===SIEGE;v('newc').style.visibility=s?'hidden':'';v('lcl').textContent=s?'Agence cliente':'Client';
     KFN.get('/gestion/api?a=clients&agence='+encodeURIComponent(v('agence').value)).then(function(l){v('client').innerHTML='<option value="">— '+(s?'Choisir l’agence cliente':'Choisir le client')+' —</option>'+l.map(function(c){return '<option'+(c.nom===sel?' selected':'')+'>'+KFN.esc(c.nom)+'</option>';}).join('');});}
   function calc(){var m=KFN.num(v('pv').value)*KFN.num(v('qte').value);v('mt').value=KFN.fmt(m);v('net').value=KFN.fmt(m-KFN.num(v('rem').value));}
   ['pv','qte','rem'].forEach(function(k){v(k).addEventListener('input',calc);});
-  v('agence').onchange=function(){g.set([]);loadClients();};
+  v('agence').onchange=function(){location='/gestion?p=facture&agence='+encodeURIComponent(v('agence').value);};
   v('pick').onclick=function(){KFN.pick({title:'Articles en stock — '+v('agence').value,url:'/gestion/api?a=stock&agence='+encodeURIComponent(v('agence').value),cols:[{k:'ref',label:'Référence'},{k:'lib',label:'Libellé'},{k:'qte',label:'Stock',cls:'r',fmt:KFN.fmt},{k:'pv',label:'Prix vente',cls:'r',fmt:KFN.fmt}],
     onPick:function(r){cur=r;v('ref').value=r.ref;v('lib').value=r.lib;v('unite').value=r.unite;v('stk').value=KFN.fmt(r.qte);v('pv').value=r.pv;v('qte').value='';v('rem').value=0;calc();v('qte').focus();}});};
   v('add').onclick=function(){if(!cur){KFN.toast('Choisissez un article avec « Afficher articles ».','err');return;}var q=KFN.num(v('qte').value),pv=KFN.num(v('pv').value),r=KFN.num(v('rem').value);

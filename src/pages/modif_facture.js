@@ -58,7 +58,7 @@ ${done ? `<div class="flash info"><a class="btn sm green" href="/gestion/print?t
     onChange:function(r){v('tot').value=KFN.fmt(r.reduce(function(s,x){return s+KFN.num(x.net);},0));}});
   function ag(){return encodeURIComponent(v('agence').value);}
   function loadClients(){v('lcl').textContent=v('agence').value===SIEGE?'Agence cliente':'Client';KFN.get('/gestion/api?a=clients&agence='+ag()).then(function(l){v('client').innerHTML='<option value="">— Client —</option>'+l.map(function(c){return '<option>'+KFN.esc(c.nom)+'</option>';}).join('');});}
-  v('agence').onchange=function(){g.set([]);loadClients();};
+  v('agence').onchange=function(){location='/gestion?p=modif_facture&agence='+encodeURIComponent(v('agence').value);};
   v('client').onchange=function(){KFN.get('/gestion/api?a=factures_client&agence='+ag()+'&client='+encodeURIComponent(v('client').value)).then(function(l){facts=l;
     v('fact').innerHTML='<option value="">— '+(l.length?'Choisir la facture':'Aucune facture')+' —</option>'+l.map(function(f,i){return '<option value="'+i+'">'+KFN.esc(f.num)+' · '+f.type+' · '+f.date+' · '+KFN.fmt(f.montant)+(f.livre==2?' · facture d’appro':'')+'</option>';}).join('');g.set([]);v('info').textContent='';});};
   v('fact').onchange=function(){var f=facts[this.value];if(!f)return;v('num').value=f.num;v('type').value=f.type;if(v('conv'))v('conv').hidden=f.type!=='Pro-forma';

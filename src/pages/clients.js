@@ -11,7 +11,7 @@ module.exports = async ctx => {
       FROM t_structure s WHERE s.nom_structure <> ? ORDER BY s.nom_structure`, [C.SIEGE, C.SIEGE, C.SIEGE, C.SIEGE]);
     return `<h1 class="page-title">Clients du siège : les agences</h1>
 <div class="card"><form method="get" action="/gestion" class="row" style="margin-bottom:.7rem"><input type="hidden" name="p" value="clients"><div class="f"><select name="agence" data-autosubmit>${ctx.agOptions(ag)}</select></div></form>
-<div class="flash info">Les clients de l'<b>AGENCE SIEGE</b> sont les autres agences : seules elles peuvent être facturées et payer à la caisse du siège.
+<div class="flash info">Les clients de l'<b>AGENCE SIEGE</b> sont les autres agences. Le siège ne leur vend pas directement : leurs pré-commandes acceptées deviennent leurs impayés, réglés dans <b>Compte des agences</b>.
 Pour ajouter un client du siège, créez une agence dans <b>ADMIN → Paramétrage des agences</b>.</div>
 <div class="tbl-wrap"><table class="tbl grey"><thead><tr><th>Agence cliente</th><th>Code</th><th>Contact</th><th>E-mail</th><th class="r">Factures</th><th class="r">Total facturé</th><th class="r">Reste à payer</th><th></th></tr></thead><tbody>
 ${list.map(c => `<tr><td><b>${e(c.nom)}</b></td><td>${e(c.codecourt)}</td><td>${e(c.contact)}</td><td>${e(c.email)}</td><td class="r">${c.nb}</td><td class="r">${money(c.total)}</td><td class="r ${c.reste > 0 ? 'neg' : ''}">${money(c.reste)}</td>

@@ -99,6 +99,17 @@ module.exports = async (req, res) => {
             sections: [{ titre: 'Factures contenant cet article (touchez une ligne pour le détail)', cols: ['N° facture', 'Date', 'Client', 'Qté', 'P.U.', 'Net'], num: [3, 4, 5], lien: { type: 'facture', col: 0, key: 'num' },
               rows: rows.map(r => [r.idcmde, r.dt, r.nomprenom, r.qte, r.pv, r.mtapayer]) }] });
         }
+        if (t === 'precmd') {
+          const l = await C.rows('SELECT * FROM t_precommandeagence WHERE idcmde = ? ORDER BY idprecommandeagence', [qv('num')]);
+          if (!l.length || !inAg(l[0].structures)) return out({ error: 'Pré-commande introuvable' }, 404);
+          const ST = { EN_ATTENTE: 'En attente du siège', VALIDE_SIEGE: 'Validée — à réceptionner', RECU_AGENCE: 'Réceptionnée', RETOURNE_SIEGE: 'Retournée au siège' }, f = l[0];
+          return out({ titre: `Pré-commande ${f.idcmde} — ${f.structures}`,
+            sousTitre: `Demandée le ${C.dfr(f.dateenreg)} par ${f.utilisateur || '—'}` + (f.datevalidation ? ` · validée le ${C.dfr(f.datevalidation)} par ${f.validepar || '—'}` : '') + (f.datereception ? ` · réception le ${C.dfr(f.datereception)} par ${f.recupar || '—'}` : ''),
+            resume: [['Articles', l.length], ['Qté demandée', l.reduce((a, x) => a + Number(x.qte), 0)], ['Qté accordée', l.reduce((a, x) => a + Number(x.qtevalidee), 0)], ['Montant accordé', l.reduce((a, x) => a + Number(x.qtevalidee) * Number(x.pv), 0)]],
+            imprimer: '/gestion/print?t=' + (f.datevalidation ? 'validation' : 'fichepre') + '&n=' + encodeURIComponent(f.idcmde),
+            sections: [{ titre: 'Produits', cols: ['Référence', 'Article', 'Demandé', 'Accordé', 'Prix', 'Montant accordé', 'État'], num: [2, 3, 4, 5],
+              rows: l.map(x => [x.refarticles, x.libarticles, x.qte, x.qtevalidee, x.pv, Number(x.qtevalidee) * Number(x.pv), ST[x.statut] || x.statut]) }] });
+        }
         if (t === 'appro') {
           const n2 = qv('num');
           let rows = await C.rows(`SELECT refarticles, libarticles, qteappro, prixachat, totalachat, structures, fournisseur, ${D('dateappro')} dt FROM t_appro WHERE numappro = ? ORDER BY idt_appro`, [n2]);

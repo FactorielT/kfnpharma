@@ -54,6 +54,11 @@ CREATE TABLE IF NOT EXISTS t_parametres (cle VARCHAR(60) PRIMARY KEY, valeur TEX
 CREATE TABLE IF NOT EXISTS t_notification (idnotification BIGSERIAL PRIMARY KEY, datecreation TIMESTAMP DEFAULT NOW(), evenement VARCHAR(30), reference VARCHAR(60),
   structures VARCHAR(50), destinataire VARCHAR(30), message TEXT, fournisseur VARCHAR(20), statut VARCHAR(12) DEFAULT 'EN_COURS', erreur TEXT, dateenvoi TIMESTAMP, utilisateur VARCHAR(50));
 CREATE INDEX IF NOT EXISTS idx_notif_date ON t_notification (datecreation);
+ALTER TABLE t_inventaire ADD COLUMN IF NOT EXISTS numinventaire VARCHAR(40);
+ALTER TABLE t_paiement_sl ADD COLUMN IF NOT EXISTS idversement BIGINT;
+ALTER TABLE t_compteagence ADD COLUMN IF NOT EXISTS factures TEXT;
+ALTER TABLE t_inventaire ADD COLUMN IF NOT EXISTS datedebut DATE;
+CREATE INDEX IF NOT EXISTS idx_inv_num ON t_inventaire (numinventaire);
 INSERT INTO t_parametres (cle, valeur) VALUES ('wa_fournisseur','aucun'), ('wa_evt_precommande','1'), ('wa_evt_validation','1'), ('wa_evt_reception','1'), ('wa_siege_numeros','') ON CONFLICT (cle) DO NOTHING;`;
 async function initDb() {
   const ok = await val("SELECT to_regclass('public.utilisateurs') IS NOT NULL");

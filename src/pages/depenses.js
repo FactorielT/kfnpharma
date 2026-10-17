@@ -33,7 +33,7 @@ module.exports = async ctx => {
   return `<h1 class="page-title">${edit ? 'Modifier une dépense' : "Sortie d'argent"}</h1>
 <form method="post" class="card" style="max-width:640px;margin-inline:auto" ${edit ? 'data-confirm="modify"' : ''}>${ctx.csrfField()}<input type="hidden" name="id" value="${edit?.idt_sortieargent || 0}">
   <p style="text-align:center"><b>${C.dfr(edit ? edit.datedepenses : C.today())}</b></p>
-  <div class="f"><label>Agence</label><select name="agence">${ctx.agOptions(ag)}</select></div>
+  <div class="f"><label>Agence</label><select name="agence" onchange="location='/gestion?p=depenses&agence='+encodeURIComponent(this.value)">${ctx.agOptions(ag)}</select></div>
   <div class="row" style="margin-top:.7rem"><div class="f"><label>Dépenses</label><select name="depense" id="dep" required>${C.selOptions(types, edit?.depense)}</select></div><button type="button" class="btn" id="adddep">Ajouter dépense</button></div>
   <div class="f" style="margin-top:.7rem"><label>Montant</label><input name="montant" class="big" inputmode="numeric" required value="${edit?.montantdepense || 0}"></div>
   <div class="f" style="margin-top:.7rem"><label>Motif</label><textarea name="motif" rows="3" maxlength="50">${e(edit?.motif)}</textarea></div>

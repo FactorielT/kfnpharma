@@ -1,7 +1,7 @@
 'use strict';
 /* Impressions : factures, pro-forma, reçus, bons et factures d'approvisionnement */
 const C = require('./core'); const W = require('./web'); const { e, money, qty } = C;
-const NUM = new Set(['qte', 'qteappro', 'qtevalidee', 'pv', 'totalvente', 'remise', 'mtapayer', 'prixachat', 'totalachat', 'total']);
+const NUM = new Set(['montantcmde', 'verse', 'reste', 'quantiteinitial', 'quantiteappro', 'depart', 'quantitestockactuel', 'quantitephysique', 'quantiteecart', 'quantitejuste', 'qte', 'qteappro', 'qtevalidee', 'pv', 'totalvente', 'remise', 'mtapayer', 'prixachat', 'totalachat', 'total']);
 module.exports = async (req, res) => {
   const ctx = await W.buildCtx(req, res);
   const t = String(req.query.t || ''), n = String(req.query.n || ''), ags = ctx.agences;
@@ -41,6 +41,38 @@ module.exports = async (req, res) => {
       meta = { 'N° appro': n, Date: C.dfr(f.dateappro), Fournisseur: f.fournisseur, 'N° lot': f.num_lot, 'Saisi par': f.utilisateur };
       cols = { refarticles: 'Réf.', libarticles: 'Désignation', qteappro: 'Qté', unitevaleur: 'Unité', prixachat: 'Prix achat', totalachat: 'Total' };
       totaux = { 'Montant total': lines.reduce((a, x) => a + Number(x.totalachat), 0) };
+    } else if (t === 'validation' || t === 'fichepre') {
+      lines = await C.rows('SELECT refarticles, libarticles, qte, qtevalidee, unitevaleur, pv, totalvente, (qtevalidee*pv) AS total, structures, dateenreg, utilisateur, datevalidation, validepar, statut FROM t_precommandeagence WHERE idcmde = ? ORDER BY idprecommandeagence', [n]);
+      if (!lines.length || !ags.includes(lines[0].structures)) return deny();
+      const f = lines[0]; agence = C.SIEGE;
+      if (t === 'fichepre') {
+        doc = 'FICHE DE PRÉ-COMMANDE';
+        meta = { 'N° pré-commande': n, 'Agence': f.structures, 'Date': C.dfr(f.dateenreg), 'Demandée par': f.utilisateur, 'État': f.statut === 'EN_ATTENTE' ? 'En attente de validation du siège' : 'Traitée' };
+        cols = { refarticles: 'Réf.', libarticles: 'Désignation', qte: 'Qté demandée', unitevaleur: 'Unité', pv: 'Prix siège', totalvente: 'Total' };
+        totaux = { 'Montant total': lines.reduce((a, x) => a + Number(x.totalvente), 0) };
+      } else {
+        doc = 'FICHE DE VALIDATION — APPROVISIONNEMENT AGENCE';
+        meta = { 'N° pré-commande': n, 'Agence': f.structures, 'Demandée le': C.dfr(f.dateenreg) + ' par ' + (f.utilisateur || ''), 'Validée le': C.dfr(f.datevalidation) + (f.validepar ? ' par ' + f.validepar : '') };
+        cols = { refarticles: 'Réf.', libarticles: 'Désignation', qte: 'Demandé', qtevalidee: 'Accordé', unitevaleur: 'Unité', pv: 'Prix', total: 'Total accordé' };
+        totaux = { 'Montant demandé': lines.reduce((a, x) => a + Number(x.totalvente), 0), 'Montant accordé': lines.reduce((a, x) => a + Number(x.total), 0) };
+      }
+    } else if (t === 'inventaire') {
+      lines = await C.rows(`SELECT libarticles, quantiteinitial, quantiteappro, (quantiteinitial + quantiteappro) AS depart, quantitestockactuel, quantitephysique, quantiteecart, quantitejuste, structures, dateinventaire, utilisateur
+        FROM t_inventaire WHERE numinventaire = ? ORDER BY libarticles`, [n]);
+      if (!lines.length || !ags.includes(lines[0].structures)) return deny();
+      const f = lines[0]; agence = f.structures; doc = "FICHE D'INVENTAIRE";
+      const d0 = await C.val('SELECT datedebut FROM t_inventaire WHERE numinventaire = ? LIMIT 1', [n]);
+      meta = { "N° d'inventaire": n, 'Agence': f.structures, 'Période': `du ${C.dfr(d0)} au ${C.dfr(f.dateinventaire)}`, 'Réalisé par': f.utilisateur, 'Articles': lines.length, 'Articles avec écart': lines.filter(x => Number(x.quantiteecart)).length };
+      cols = { libarticles: 'Libellé', quantiteinitial: 'Stock dernier inv.', quantiteappro: 'Appro période', depart: 'Stock départ', quantitestockactuel: 'Stock logiciel', quantitephysique: 'Physique', quantiteecart: 'Écart', quantitejuste: 'Qté réelle' };
+      totaux = {};
+    } else if (t === 'versement') {
+      const v = await C.row('SELECT * FROM t_compteagence WHERE idt_compteagence = ?', [Number(n)]);
+      if (!v || !(ags.includes(v.structures) || ctx.isSiege() || ctx.ustruct() === C.SIEGE)) return deny();
+      agence = C.SIEGE; doc = "REÇU DE VERSEMENT D'AGENCE"; ticket = false;
+      meta = { 'N° reçu': 'VRS-' + v.idt_compteagence, 'Date': C.dfr(v.dateversement), 'Agence': v.structures, 'Moyen': v.moyen, 'Référence': v.reference, 'Reçu par': v.utilisateur };
+      lines = await C.rows('SELECT numcmde, montantcmde, verse, reste FROM t_paiement_sl WHERE idversement = ? ORDER BY idpaiementsl', [v.idt_compteagence]);
+      cols = { numcmde: 'Facture réglée', montantcmde: 'Montant facture', verse: 'Versé sur la facture', reste: 'Reste de la facture' };
+      totaux = { 'Dû avant le versement': v.montant_total, 'Montant versé': v.verse, "Solde restant dû par l'agence": v.solde };
     } else if (t === 'precmd') {
       lines = await C.rows('SELECT refarticles, libarticles, qte, qtevalidee, unitevaleur, pv, (qtevalidee*pv) AS total, structures, dateenreg, datevalidation, validepar, datereception, recupar FROM t_precommandeagence WHERE idcmde = ? ORDER BY idprecommandeagence', [n]);
       if (!lines.length || !ags.includes(lines[0].structures)) return deny();
@@ -51,7 +83,7 @@ module.exports = async (req, res) => {
     } else return deny();
   } catch (err) { console.error(err); return deny(); }
   const S = await C.settings(), st = await C.row('SELECT * FROM t_structure WHERE nom_structure = ?', [agence]) || {};
-  const tk = Object.keys(totaux), strong = t === 'facture' ? tk.indexOf('Net à payer') : tk.length - 1;
+  const tk = Object.keys(totaux), strong = t === 'facture' ? tk.indexOf('Net à payer') : (t === 'versement' ? 1 : tk.length - 1);
   res.type('html').send(`<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${e(doc + ' ' + n)}</title>
 <style>body{font:13px/1.45 Arial,sans-serif;color:#111;margin:0;background:#eef2ef}.doc{background:#fff;max-width:${ticket ? '380px' : '820px'};margin:1rem auto;padding:${ticket ? '1rem' : '2rem 2.2rem'};box-shadow:0 10px 30px -18px rgba(0,0,0,.4)}
 .top{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;${ticket ? 'flex-direction:column;align-items:center;text-align:center' : ''}}.top img{height:${ticket ? '56px' : '70px'}}.soc{font-size:12px;color:#444;${ticket ? '' : 'text-align:right'}}
@@ -67,7 +99,7 @@ table{width:100%;border-collapse:collapse}th{background:#E07F16;color:#fff;text-
 <h1>${e(doc)}</h1><div class="meta">${Object.entries(meta).filter(([, v]) => v && String(v).trim()).map(([k, v]) => `<div><b>${e(k)} :</b> ${e(v)}</div>`).join('')}</div>
 <table><thead><tr>${Object.entries(cols).map(([k, l]) => `<th class="${NUM.has(k) ? 'r' : ''}">${e(l)}</th>`).join('')}</tr></thead><tbody>
 ${lines.map(l => `<tr>${Object.keys(cols).map(k => `<td class="${NUM.has(k) ? 'r' : ''}">${NUM.has(k) ? qty(l[k]) : e(l[k])}</td>`).join('')}</tr>`).join('')}</tbody></table>
-<table class="tot">${tk.map((k, i) => `<tr${i === strong ? ' class="s"' : ''}><td>${e(k)}</td><td class="r">${money(totaux[k])} FCFA</td></tr>`).join('')}</table>
+${tk.length ? '' : ''}<table class="tot">${tk.map((k, i) => `<tr${i === strong ? ' class="s"' : ''}><td>${e(k)}</td><td class="r">${money(totaux[k])} FCFA</td></tr>`).join('')}</table>
 <div class="sign"><div>Signature ${agence === C.SIEGE ? 'agence cliente' : 'client'}</div><div>Cachet et signature KFN Pharma</div></div>
 <div class="foot">Merci pour votre confiance — ${e(S.slogan || 'Le fournisseur N°1 du matériel médical')}<br>Imprimé le ${C.dfr(C.today())} à ${C.nowTime().slice(0, 5)} par ${e(ctx.uname())}</div></div></body></html>`);
 };

@@ -11,28 +11,28 @@ const MENU = [
   { key: 'siege', label: 'Agence Siège', siege: true, roles: ['GST'], items: [
     ['familles', 'Familles articles'], ['articles', 'Articles'], ['stock_agences', 'Enregistrement du stock'],
     ['appro_depot', 'Approvisionnement du dépôt principal'], ['appro_agences', 'Approvisionnement des agences'],
-    ['point_appros', 'Point des appros par agence'], ['stocks&prix=1', 'Prix de vente par agence'], ['fournisseurs', 'Fournisseurs'],
     ['compte_agences', 'Compte des agences (clientes du siège)', []], ['objectifs', 'Objectif par agence', []],
-    ['histogramme', 'Histogramme des objectifs', []], ['messages_site', 'Messages du site web', []]] },
+    ['histogramme', 'Histogramme des objectifs', []]] },
   { key: 'stocks', label: 'Gestion de stocks', roles: ['GST'], items: [
     ['precommande', "Pré-commande d'approvisionnement"], ['reception_appro', 'Approvisionnements (réception)'],
-    ['point_appros', 'Point des appros (validés / non validés)'], ['stocks', 'Stocks articles'], ['stocks&prix=1', 'Prix de vente de mon agence'],
-    ['inventaire', 'Inventaires stocks'], ['peremption', 'Retrait de stock (péremption)']] },
+    ['stocks', 'Stocks articles'], ['inventaire', 'Inventaires stocks'], ['peremption', 'Retrait de stock (péremption)']] },
   { key: 'ventes', label: 'Ventes articles', roles: ['VEN'], items: [
-    ['facture', 'Édition de factures / pro-forma'], ['modif_facture', 'Modification de factures'], ['clients', 'Clients']] },
+    ['facture', 'Édition de factures / pro-forma'], ['modif_facture', 'Modification de factures'], ['clients', 'Clients'],
+    ['stocks&prix=1', 'Prix de vente par agence', ['RAG']]] },
   { key: 'caisse', label: 'Paiement caisse', roles: ['CAI'], items: [
     ['caisse_jour', "Paiement des factures éditées aujourd'hui"], ['caisse_impayes', 'Paiement des impayés (factures crédit)'],
-    ['depenses', 'Dépenses journalières'], ['fermeture_caisse', 'Fermeture de caisse du jour'], ['arrets_caisse', "États d'arrêt de caisse"]] },
+    ['compte_agences', 'Compte des agences (clientes du siège)'], ['depenses', 'Dépenses journalières'], ['fermeture_caisse', 'Fermeture de caisse du jour'], ['arrets_caisse', "États d'arrêt de caisse"]] },
   { key: 'etats', label: 'Éditions des états', roles: ['CON'], items: [
     ['etats&r=ventes_jour', 'Bilans des ventes du jour'], ['etats&r=credits', 'Bilans crédits'], ['etats&r=credits_periode', 'Bilans sur période crédits'],
     ['etats&r=restes_client', 'Bilans des restes à payer par client'], ['etats&r=produits', 'Bilans produits sur période'],
     ['etats&r=clients_periode', 'Bilans clients sur période'], ['etats&r=ca_client', "Chiffres d'affaires par client"],
-    ['etats&r=appros', 'Bilans approvisionnements', ['CON', 'GST']], ['etats&r=credits45', 'Bilans des crédits plus de 45 jours'],
-    ['etats&r=paiements', 'Bilans des paiements par jour / période'], ['etats&r=compte_client', 'Compte client'],
-    ['etats&r=inventaires', 'Historiques des inventaires', ['CON', 'GST']], ['arrets_caisse', "États d'arrêt de caisse"]] },
-  { key: 'stats', label: 'Statistiques', siege: true, roles: ['CON'], items: [['statistiques', 'Statistique de vente par agence']] },
+    ['etats&r=appros', 'Bilans approvisionnements', ['CON', 'GST']], ['point_appros', 'Point des appros par agence', ['CON', 'GST']], ['compte_agences', 'Compte agence auprès du siège (impayés, versements)', ['CON', 'GST']],
+    ['etats&r=credits45', 'Bilans des crédits plus de 45 jours'], ['etats&r=paiements', 'Bilans des paiements par jour / période'],
+    ['etats&r=compte_client', 'Compte client'], ['etats&r=inventaires', 'Historiques des inventaires', ['CON', 'GST']],
+    ['arrets_caisse', "États d'arrêt de caisse"], ['statistiques', 'Statistique de vente par agence']] },
   { key: 'admin', label: 'ADMIN', roles: [], items: [
-    ['utilisateurs', 'Utilisateurs'], ['agences', 'Paramétrage des agences'], ['whatsapp', 'Notifications WhatsApp'], ['fichiers', 'Modification des fichiers (tables)'],
+    ['utilisateurs', 'Utilisateurs'], ['agences', 'Paramétrage des agences'], ['fournisseurs', 'Fournisseurs'], ['whatsapp', 'Notifications WhatsApp'],
+    ['messages_site', 'Messages du site web'], ['fichiers', 'Modification des fichiers (tables)'],
     ['excel&a=import', 'Importation des données (Excel)'], ['excel&a=export', 'Exportation des données (Excel)'], ['csv', 'Importation de fichiers CSV']] },
 ];
 function menuVisible(u, m) {
@@ -76,6 +76,10 @@ async function buildCtx(req, res) {
     isSuper: () => C.isSuper(u), isAdmin: () => C.isAdmin(u),
     /* Modifier / supprimer : Super Admin, Administrateur et Responsable d'agence uniquement */
     canEdit: () => C.isAdmin(u) || C.level(u) === 'RAG',
+    /* Ventes et caisse : l'opérateur doit être configuré dans l'agence concernée */
+    estOperateur: ag => ag === (u?.structures || ''),
+    requireOperateur(ag, back) { if (ag !== (u?.structures || '')) { ctx.flash(`Action impossible : vous n'êtes pas configuré(e) dans l'agence « ${ag} ». Seuls les opérateurs de cette agence peuvent faire des ventes et des opérations de caisse.`, 'err'); ctx.redirect(back); } },
+    estSiege: () => u?.structures === C.SIEGE || C.isSuper(u),
     requireEdit(back) { if (!ctx.canEdit()) { ctx.flash('Seuls le Super Admin, l’Administrateur et le Responsable d’agence peuvent modifier ou supprimer.', 'err'); ctx.redirect(back); } },
     level: () => C.level(u), uname: () => u?.nom_prenoms || '', ustruct: () => u?.structures || '',
   };

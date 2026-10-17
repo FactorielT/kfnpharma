@@ -622,3 +622,12 @@ CREATE TABLE IF NOT EXISTS t_notification (
   utilisateur    VARCHAR(50)
 );
 CREATE INDEX IF NOT EXISTS idx_notif_date ON t_notification (datecreation);
+
+-- Inventaires : numéro de fiche et date de début de période
+ALTER TABLE t_inventaire ADD COLUMN IF NOT EXISTS numinventaire VARCHAR(40);
+ALTER TABLE t_inventaire ADD COLUMN IF NOT EXISTS datedebut DATE;
+CREATE INDEX IF NOT EXISTS idx_inv_num ON t_inventaire (numinventaire);
+
+-- Versements des agences au siège : lien versement -> paiements des factures
+ALTER TABLE t_paiement_sl ADD COLUMN IF NOT EXISTS idversement BIGINT;
+ALTER TABLE t_compteagence ADD COLUMN IF NOT EXISTS factures TEXT;

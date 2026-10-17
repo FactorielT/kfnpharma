@@ -4,6 +4,15 @@ const C = require('../core'); const { e, money, num } = C;
 module.exports = async (ctx, mode, page) => {
   const ag = ctx.agenceOk(ctx.get('agence') || ctx.post('agence'));
   const back = `?p=${page}&agence=${encodeURIComponent(ag)}`, siege = ag === C.SIEGE;
+  if (siege) {
+    if (ctx.req.method === 'POST') { ctx.flash('Les impayés des agences se règlent dans Compte des agences (clientes du siège).', 'err'); ctx.redirect('?p=compte_agences'); }
+    return `<h1 class="page-title">Paiement à la caisse du siège</h1>
+<div class="card"><div class="flash info" style="margin:0 0 1rem">Le <b>siège ne vend pas aux agences</b>. Les agences s'approvisionnent par les <b>pré-commandes</b> :
+une pré-commande validée par le siège puis acceptée par l'agence devient une facture d'approvisionnement, c'est-à-dire un <b>impayé de l'agence</b>,
+réglé dans <b>Compte des agences (clientes du siège)</b>, avec le détail des versements, le solde et le reste.</div>
+<div class="actions" style="justify-content:flex-start"><a class="btn orange" href="/gestion?p=compte_agences">Ouvrir le compte des agences</a><a class="btn" href="/gestion?p=appro_agences">Approvisionnement des agences</a>
+<form method="get" action="/gestion" class="row" style="margin-left:auto"><input type="hidden" name="p" value="${page}"><select name="agence" data-autosubmit>${ctx.agOptions(ag)}</select></form></div></div>`;
+  }
   if (ctx.req.method === 'POST' && ctx.post('annuler')) {
     ctx.requireEdit(back);
     const pid = ctx.post('annuler'), sl = pid[0] === 'S', id = Number(pid.slice(1));

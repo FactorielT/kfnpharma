@@ -224,3 +224,7 @@ table.xl{border-collapse:collapse;font-size:.84rem;min-width:100%}
 .notif__txt{flex:1;min-width:0;display:grid}.notif__txt span{color:var(--ink)}.notif__txt small{color:var(--muted)}
 @media (max-width:600px){.notif{flex-wrap:wrap}.notif .badge{margin-left:2.8rem}}
 @media print{.notif-btn{display:none}}
+.tbl.inv th{background:#0D4F9C;text-align:center;white-space:normal;line-height:1.2;font-size:.8rem;text-transform:uppercase}
+.tbl.inv td.edit input{min-width:80px}
+
+[hidden]{display:none!important}

@@ -91,6 +91,7 @@ function csrfOk(req) {
   const t = req.body?._csrf || req.get('x-csrf') || '';
   return req.session.csrf && t === req.session.csrf;
 }
+const OPERATEUR = ['facture', 'modif_facture', 'caisse_jour', 'caisse_impayes', 'depenses', 'fermeture_caisse'];
 const PAGES = {};
 for (const f of fs.readdirSync(path.join(__dirname, 'src', 'pages'))) if (f.endsWith('.js') && !f.startsWith('_')) PAGES[f.slice(0, -3)] = require('./src/pages/' + f);
 
@@ -104,7 +105,12 @@ async function gestion(req, res) {
     else if (!W.pageAllowed(ctx.user, page, page === 'etats' ? String(req.query.r || 'ventes_jour') : '')) { res.status(403); content = '<div class="flash err">Vous n’avez pas accès à cette rubrique. Contactez l’administrateur.</div>'; }
     else {
       if (req.method === 'POST' && !csrfOk(req)) return res.status(419).send('Session expirée. Rechargez la page et recommencez.');
+      // Ventes et caisse : seuls les opérateurs configurés dans l'agence concernée peuvent agir
+      const opAg = OPERATEUR.includes(page) ? ctx.agenceOk(ctx.post('agence') || ctx.get('agence')) : null;
+      if (opAg && req.method === 'POST') ctx.requireOperateur(opAg, `?p=${page}&agence=${encodeURIComponent(opAg)}`);
       content = await PAGES[page](ctx);
+      if (opAg && !ctx.estOperateur(opAg) && content) content = `<div class="flash err no-print" data-lecture>Consultation seulement : vous n'êtes pas configuré(e) dans l'agence « ${e(opAg)} ». Pour faire des ventes ou des opérations de caisse, l'opérateur doit être configuré dans l'agence concernée (ADMIN → Utilisateurs).</div>` + content
+        + `<script>document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('form[method=post] button:not([type=button]), form[method=post] [data-act]').forEach(function(b){b.disabled=true;b.title='Réservé aux opérateurs de cette agence';});});</script>`;
       if (ctx.sent) return;
     }
   } catch (err) {
