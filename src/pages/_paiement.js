@@ -4,6 +4,19 @@ const C = require('../core'); const { e, money, num } = C;
 module.exports = async (ctx, mode, page) => {
   const ag = ctx.agenceOk(ctx.get('agence') || ctx.post('agence'));
   const back = `?p=${page}&agence=${encodeURIComponent(ag)}`, siege = ag === C.SIEGE;
+  if (ctx.req.method === 'POST' && ctx.post('annuler')) {
+    ctx.requireEdit(back);
+    const pid = ctx.post('annuler'), sl = pid[0] === 'S', id = Number(pid.slice(1));
+    const r = await C.tx(async () => {
+      const p = sl ? await C.row('SELECT * FROM t_paiement_sl WHERE idpaiementsl = ? AND structures = ?', [id, ag]) : await C.row('SELECT * FROM t_paiement WHERE idpaiement = ? AND structures = ?', [id, ag]);
+      if (!p) return { err: 'Paiement introuvable.' };
+      if (Number(await C.val('SELECT COUNT(*) FROM t_fermercaisse WHERE structures = ? AND datefermer = ? AND caissefermee = 1', [ag, p.datepaiement]))) return { err: `La caisse du ${C.dfr(p.datepaiement)} est fermée : rouvrez-la d'abord (Fermeture de caisse).` };
+      await C.q(sl ? 'DELETE FROM t_paiement_sl WHERE idpaiementsl = ?' : 'DELETE FROM t_paiement WHERE idpaiement = ?', [id]);
+      await C.q('UPDATE t_commande SET verse = GREATEST(0, verse - ?), reste = reste + LEAST(verse, ?) WHERE numcmde = ? AND structures = ?', [p.verse, p.verse, p.numcmde, ag]);
+      return { msg: `Paiement de ${money(p.verse)} FCFA sur ${p.numcmde} annulé : le montant est de nouveau dû.` };
+    });
+    ctx.flash(r.err || r.msg, r.err ? 'err' : 'ok'); ctx.redirect(back);
+  }
   if (ctx.req.method === 'POST') {
     const numc = ctx.post('num'), percu = Math.round(num(ctx.post('percu')));
     const r = await C.tx(async () => {
@@ -29,6 +42,8 @@ module.exports = async (ctx, mode, page) => {
     ? await C.rows('SELECT numcmde, nomprenom, mtapayer, reste, datecmde FROM t_commande WHERE structures = ? AND datecmde = CURRENT_DATE AND reste > 0 ORDER BY idcommande DESC', [ag])
     : await C.rows('SELECT numcmde, nomprenom, mtapayer, reste, datecmde FROM t_commande WHERE structures = ? AND reste > 0 ORDER BY nomprenom, datecmde', [ag]);
   const clients = [...new Set(facts.map(f => f.nomprenom))];
+  const tbl = mode === 'jour' ? 't_paiement' : 't_paiement_sl', idc = mode === 'jour' ? 'idpaiement' : 'idpaiementsl', pre = mode === 'jour' ? 'P' : 'S';
+  const payes = await C.rows(`SELECT ${idc} AS id, numcmde, client, verse, modepaiement, agent, heure FROM ${tbl} WHERE structures = ? AND datepaiement = CURRENT_DATE ORDER BY ${idc} DESC`, [ag]);
   const recu = ctx.get('recu'), lc = siege ? 'Agence cliente' : 'Client';
   return `<h1 class="page-title" style="background:${mode === 'jour' ? 'var(--green)' : '#1B3A6B'}">Paiement à la caisse${siege ? ' du siège' : ''}</h1>
 ${recu ? `<div class="flash info"><a class="btn sm green" href="/gestion/print?t=recu&n=${e(recu)}" target="_blank">Imprimer le reçu</a></div>` : ''}
@@ -50,6 +65,10 @@ ${siege ? '<div class="flash info">À la caisse du siège, seules les <b>agences
     <div class="f"><label>Saisissez le montant perçu</label><input name="percu" id="percu" class="big" inputmode="numeric" value="0"></div><div class="f"><label id="lres">Reste / monnaie</label><input id="res" class="big" readonly></div>
     <div class="f span2"><label>Mode de paiement</label><select name="modep">${C.selOptions(['Espèce', 'Mobile Money', 'Chèque', 'Virement', 'Carte bancaire'], null, false)}</select></div></div>
   <div class="actions"><a class="btn ghost" href="/gestion">Retour</a><button class="btn" style="min-width:150px">Valider</button></div></form>
+<div class="card"><h2>${mode === 'jour' ? 'Paiements encaissés aujourd\'hui' : 'Paiements d\'impayés encaissés aujourd\'hui'} — ${money(payes.reduce((s, x) => s + x.verse, 0))} FCFA</h2>
+<div class="tbl-wrap"><table class="tbl grey"><thead><tr><th>Heure</th><th>N° facture</th><th>${lc}</th><th class="r">Versé</th><th>Mode</th><th>Caissier(ère)</th><th></th></tr></thead><tbody>
+${payes.map(x => `<tr><td>${e(String(x.heure || '').slice(0, 5))}</td><td>${e(x.numcmde)}</td><td>${e(x.client)}</td><td class="r">${money(x.verse)}</td><td>${e(x.modepaiement)}</td><td>${e(x.agent)}</td>
+  <td class="r" style="white-space:nowrap"><a class="btn sm ghost" target="_blank" href="/gestion/print?t=recu&n=${pre}${x.id}">Reçu</a>${ctx.canEdit() ? ` <form method="post" style="display:inline" data-confirm="delete">${ctx.csrfField()}<input type="hidden" name="agence" value="${e(ag)}"><button class="btn sm red" name="annuler" value="${pre}${x.id}">Annuler</button></form>` : ''}</td></tr>`).join('') || '<tr><td colspan="7" class="empty">Aucun paiement aujourd\'hui.</td></tr>'}</tbody></table></div></div>
 <script>
 (function(){function v(id){return document.getElementById(id);}var due=0,cli=v('cli');
   if(cli)cli.onchange=function(){[].forEach.call(v('fact').options,function(o,i){if(i)o.hidden=cli.value&&o.dataset.client!==cli.value;});v('fact').value='';};

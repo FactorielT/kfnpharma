@@ -5,6 +5,7 @@ module.exports = async ctx => {
   const ag = ctx.agenceOk(ctx.get('agence') || ctx.post('agence'));
   const back = '?p=modif_facture&agence=' + encodeURIComponent(ag);
   if (ctx.req.method === 'POST') {
+    ctx.requireEdit(back);
     const num = ctx.post('num'), type = ctx.post('type'), act = ctx.post('action'), client = ctx.post('client');
     let lines = []; try { lines = JSON.parse(ctx.post('lignes', '[]')); } catch {}
     const r = await C.tx(async () => {
@@ -34,6 +35,7 @@ module.exports = async ctx => {
   }
   const done = ctx.get('done');
   return `<h1 class="page-title">Modification de facture / pro-forma</h1>
+${ctx.canEdit() ? '' : '<div class="flash info">Consultation seulement : la modification et la suppression sont réservées au Super Admin, à l’Administrateur et au Responsable d’agence.</div>'}
 ${done ? `<div class="flash info"><a class="btn sm green" href="/gestion/print?t=${e(ctx.get('t'))}&n=${encodeURIComponent(done)}" target="_blank">Imprimer ${e(done)}</a></div>` : ''}
 <form method="post" class="card" id="fm">${ctx.csrfField()}<input type="hidden" name="lignes" id="lignes"><input type="hidden" name="num" id="num"><input type="hidden" name="type" id="type"><input type="hidden" name="action" id="action" value="modifier">
   <div class="grid g4"><div class="f"><label>Agence</label><select name="agence" id="agence">${ctx.agOptions(ag)}</select></div>
@@ -47,8 +49,8 @@ ${done ? `<div class="flash info"><a class="btn sm green" href="/gestion/print?t
   <div class="grid-tools"><button type="button" class="btn sm" id="rm">Retirer la ligne sélectionnée</button></div>
   <div class="tbl-wrap"><table class="tbl" id="grid"><thead></thead><tbody></tbody></table></div>
   <div class="row" style="justify-content:center;margin-top:1rem"><div class="f" style="max-width:300px"><label>Total facture</label><input id="tot" class="total-box" readonly value="0"></div></div>
-  <div class="actions"><button type="button" class="btn" id="print">Imprimer</button><button class="btn green" data-act="modifier" data-confirm="modify">Modifier</button>
-    <button class="btn orange" data-act="convertir" id="conv" hidden>Transformer en facture</button><button class="btn red" data-act="supprimer" data-confirm="delete">Supprimer</button></div></form>
+  <div class="actions"><button type="button" class="btn" id="print">Imprimer</button>${ctx.canEdit() ? `<button class="btn green" data-act="modifier" data-confirm="modify">Modifier</button>
+    <button class="btn orange" data-act="convertir" id="conv" hidden>Transformer en facture</button><button class="btn red" data-act="supprimer" data-confirm="delete">Supprimer</button>` : ''}</div></form>
 <script>
 (function(){
   var SIEGE=${JSON.stringify(C.SIEGE)};function v(id){return document.getElementById(id);}var cur=null,facts=[];
@@ -59,7 +61,7 @@ ${done ? `<div class="flash info"><a class="btn sm green" href="/gestion/print?t
   v('agence').onchange=function(){g.set([]);loadClients();};
   v('client').onchange=function(){KFN.get('/gestion/api?a=factures_client&agence='+ag()+'&client='+encodeURIComponent(v('client').value)).then(function(l){facts=l;
     v('fact').innerHTML='<option value="">— '+(l.length?'Choisir la facture':'Aucune facture')+' —</option>'+l.map(function(f,i){return '<option value="'+i+'">'+KFN.esc(f.num)+' · '+f.type+' · '+f.date+' · '+KFN.fmt(f.montant)+(f.livre==2?' · facture d’appro':'')+'</option>';}).join('');g.set([]);v('info').textContent='';});};
-  v('fact').onchange=function(){var f=facts[this.value];if(!f)return;v('num').value=f.num;v('type').value=f.type;v('conv').hidden=f.type!=='Pro-forma';
+  v('fact').onchange=function(){var f=facts[this.value];if(!f)return;v('num').value=f.num;v('type').value=f.type;if(v('conv'))v('conv').hidden=f.type!=='Pro-forma';
     KFN.get((f.type==='Facture'?'/gestion/api?a=facture_lignes&num=':'/gestion/api?a=proforma_lignes&num=')+encodeURIComponent(f.num)).then(function(d){var l=d.lignes||d;l.forEach(function(x){x.qte=+x.qte;x.pv=+x.pv;x.total=+x.total;x.remise=+x.remise;x.net=+x.net;});g.set(l);
       v('info').innerHTML=f.type+' <b>'+KFN.esc(f.num)+'</b> du '+f.date+(f.type==='Facture'?' — déjà versé : <b>'+KFN.fmt(f.verse)+'</b>':'')+(f.livre==2?' — <b>facture d’approvisionnement : non modifiable ici</b>':'');});};
   function calc(){v('net').value=KFN.fmt(KFN.num(v('pv').value)*KFN.num(v('qte').value)-KFN.num(v('rem').value));}

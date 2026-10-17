@@ -2,6 +2,22 @@
 const C = require('../core'); const { e, num } = C;
 module.exports = async ctx => {
   ctx.title = 'Approvisionnement du dépôt principal';
+  if (ctx.req.method === 'POST' && ctx.post('annuler')) {
+    ctx.requireEdit('?p=appro_depot');
+    const n = ctx.post('annuler');
+    const r = await C.tx(async () => {
+      const l = await C.rows('SELECT * FROM t_appro WHERE numappro = ? AND structures = ?', [n, C.SIEGE]);
+      if (!l.length) return { err: 'Approvisionnement introuvable.' };
+      for (const a of l) {
+        const s = await C.stockRow(C.SIEGE, a.refarticles);
+        if (!s || Number(s.quantitestock) < Number(a.qteappro)) return { err: `Annulation impossible : le stock du siège en « ${a.libarticles} » (${C.qty(s?.quantitestock || 0)}) est inférieur à la quantité approvisionnée (${C.qty(a.qteappro)}).` };
+      }
+      for (const a of l) await C.stockMove(C.SIEGE, a.refarticles, -Number(a.qteappro));
+      await C.q('DELETE FROM t_appro WHERE numappro = ? AND structures = ?', [n, C.SIEGE]);
+      return { msg: `Approvisionnement ${n} annulé : quantités retirées du stock du siège.` };
+    });
+    ctx.flash(r.err || r.msg, r.err ? 'err' : 'ok'); ctx.redirect('?p=appro_depot');
+  }
   if (ctx.req.method === 'POST') {
     let lines = []; try { lines = JSON.parse(ctx.post('lignes', '[]')); } catch {}
     const four = ctx.post('fournisseur') || 'FOURNISSEUR DIVERS';
@@ -23,6 +39,7 @@ module.exports = async ctx => {
   }
   const fours = (await C.rows('SELECT fournisseur FROM t_fournisseur ORDER BY fournisseur')).map(r => r.fournisseur);
   const pr = ctx.get('print');
+  const recents = await C.rows("SELECT numappro, MIN(dateappro) d, MIN(fournisseur) f, COUNT(*) n, SUM(totalachat) t FROM t_appro WHERE structures = ? AND fournisseur <> 'KFN SIEGE' GROUP BY numappro ORDER BY MIN(idt_appro) DESC LIMIT 20", [C.SIEGE]);
   return `<h1 class="page-title">Approvisionnement des produits pour dépôt principal</h1>
 ${pr ? `<div class="flash info">Bon d'approvisionnement : <a href="/gestion/print?t=appro&n=${encodeURIComponent(pr)}" target="_blank">imprimer ${e(pr)}</a></div>` : ''}
 <form method="post" class="card" id="fa">${ctx.csrfField()}<input type="hidden" name="lignes" id="lignes">
@@ -38,6 +55,8 @@ ${pr ? `<div class="flash info">Bon d'approvisionnement : <a href="/gestion/prin
   <div class="grid-tools"><button type="button" class="btn sm red" id="rm">− Retirer la ligne</button></div>
   <div class="tbl-wrap"><table class="tbl" id="grid"><thead></thead><tbody></tbody><tfoot><tr><td colspan="5">Total</td><td class="r" id="tot">0</td></tr></tfoot></table></div>
   <div class="actions"><button class="btn" style="background:#0000E6">Enregistrer</button></div></form>
+<div class="card"><h2>Derniers approvisionnements du dépôt principal</h2><div class="tbl-wrap"><table class="tbl grey"><thead><tr><th>N° appro</th><th>Date</th><th>Fournisseur</th><th class="r">Lignes</th><th class="r">Montant</th><th></th></tr></thead><tbody>
+${recents.map(a => `<tr><td>${e(a.numappro)}</td><td>${C.dfr(a.d)}</td><td>${e(a.f)}</td><td class="r">${a.n}</td><td class="r">${C.money(a.t)}</td><td class="r" style="white-space:nowrap"><a class="btn sm ghost" target="_blank" href="/gestion/print?t=appro&n=${encodeURIComponent(a.numappro)}">Bon</a>${ctx.canEdit() ? ` <form method="post" style="display:inline" data-confirm="delete">${ctx.csrfField()}<button class="btn sm red" name="annuler" value="${e(a.numappro)}">Annuler</button></form>` : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">Aucun approvisionnement.</td></tr>'}</tbody></table></div></div>
 <script>
 (function(){
   var cur=null, g=new KFN.Lines(document.getElementById('grid'),{input:document.getElementById('lignes'),key:'ref',

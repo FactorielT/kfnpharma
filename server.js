@@ -112,7 +112,7 @@ async function gestion(req, res) {
     console.error(err);
     content = `<div class="flash err">Erreur : ${e(err.message)}</div>`;
   }
-  res.type('html').send(W.layout(ctx, page, cur, content || ''));
+  res.type('html').send(await W.layout(ctx, page, cur, content || ''));
 }
 app.get('/gestion', requireLogin, wrap(gestion));
 app.post('/gestion', requireLogin, upload.any(), wrap(gestion));

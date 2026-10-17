@@ -72,6 +72,41 @@
     return dialog({ alert: true, title: title || 'Information', msg: msg, icon: 'i', tone: 'b', buttons: [['OK', '1', 'green']] });
   };
 
+  /* ---------- Détail d'une ligne d'état (facture, client, produit, appro) ---------- */
+  KFN.details = function (qs) {
+    var m = document.createElement('div'); m.className = 'modal';
+    m.innerHTML = '<div class="modal__box" role="dialog" aria-modal="true" style="background:#fff;width:min(1000px,100%)"><div class="modal__head"><h3>Chargement…</h3>' +
+      '<a class="btn sm" target="_blank" hidden data-print-link>Imprimer</a><button class="btn green sm" data-close>Fermer</button></div><div class="modal__body"></div></div>';
+    function close() { m.remove(); document.removeEventListener('keydown', esc); }
+    function esc(e) { if (e.key === 'Escape') close(); }
+    document.addEventListener('keydown', esc);
+    m.querySelector('[data-close]').onclick = close;
+    m.addEventListener('click', function (e) { if (e.target === m) close(); });
+    document.body.appendChild(m);
+    var body = m.querySelector('.modal__body');
+    KFN.get('/gestion/api?a=details&' + qs).then(function (d) {
+      if (d.error) { m.querySelector('h3').textContent = 'Détail'; body.innerHTML = '<p class="flash err">' + KFN.esc(d.error) + '</p>'; return; }
+      m.querySelector('h3').textContent = d.titre;
+      if (d.imprimer) { var pl = m.querySelector('[data-print-link]'); pl.href = d.imprimer; pl.hidden = false; }
+      var h = d.sousTitre ? '<p class="hint" style="margin-top:0">' + KFN.esc(d.sousTitre) + '</p>' : '';
+      if (d.resume) h += '<div class="kpis">' + d.resume.map(function (x) { return '<div class="kpi"><small>' + KFN.esc(x[0]) + '</small><b>' + KFN.fmt(x[1]) + '</b></div>'; }).join('') + '</div>';
+      d.sections.forEach(function (s, si) {
+        h += '<h2 style="margin-top:1rem">' + KFN.esc(s.titre) + '</h2><div class="tbl-wrap" style="max-height:45vh"><table class="tbl grey"><thead><tr>' +
+          s.cols.map(function (c, i) { return '<th class="' + (s.num.indexOf(i) >= 0 ? 'r' : '') + '">' + KFN.esc(c) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+          (s.rows.length ? s.rows.map(function (r) {
+            return '<tr' + (s.lien ? ' class="click" data-sub="' + si + '"' : '') + '>' + r.map(function (v, i) { return '<td class="' + (s.num.indexOf(i) >= 0 ? 'r' : '') + '">' + (s.num.indexOf(i) >= 0 ? KFN.fmt(v) : KFN.esc(v)) + '</td>'; }).join('') + '</tr>';
+          }).join('') : '<tr><td class="empty" colspan="' + s.cols.length + '">Aucune donnée.</td></tr>') + '</tbody></table></div>';
+      });
+      body.innerHTML = h;
+      body.querySelectorAll('tr[data-sub]').forEach(function (tr) {
+        tr.addEventListener('click', function () {
+          var s = d.sections[+tr.dataset.sub], v = tr.cells[s.lien.col].textContent;
+          KFN.details('type=' + s.lien.type + '&' + s.lien.key + '=' + encodeURIComponent(v));
+        });
+      });
+    }).catch(function () { body.innerHTML = '<p class="flash err">Chargement impossible.</p>'; });
+  };
+
   /* ---------- Fenêtre de choix (pop-up) ----------
      KFN.pick({title, url|data, cols:[{k,label,cls,fmt}], onPick(row)}) */
   KFN.pick = function (o) {
@@ -253,6 +288,22 @@
         });
       });
     });
+    // Notifications des pré-commandes : actualisation toutes les 60 s
+    var main = $('main.main');
+    if (main && main.dataset.notif !== undefined) {
+      var prev = main.dataset.notif.split(',').map(Number);
+      setInterval(function () {
+        KFN.get('/gestion/api?a=notifs').then(function (n) {
+          if (!n || n.error) return;
+          var br = $('#nbr'), bb = $('#nbb');
+          if (br) { br.textContent = n.rouge; br.parentNode.hidden = !n.rouge; }
+          if (bb) { bb.textContent = n.bleu; bb.parentNode.hidden = !n.bleu; }
+          var nv = $('.notif-btn .nb-vert'); if (nv) nv.hidden = !!(n.bleu || n.rouge);
+          if (n.bleu > prev[0] && n.nouveaux.length) KFN.toast('✉ ' + n.nouveaux[0].titre, 'info');
+          prev = [n.bleu, n.rouge];
+        }).catch(function () {});
+      }, 60000);
+    }
     // lignes cliquables (lien)
     $$('tr[data-href]').forEach(function (tr) { tr.classList.add('click'); tr.addEventListener('click', function () { location.href = tr.dataset.href; }); });
   });

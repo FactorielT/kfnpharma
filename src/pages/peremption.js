@@ -3,6 +3,18 @@ const C = require('../core'); const { e, qty, num } = C;
 module.exports = async ctx => {
   ctx.title = 'Retrait de stock (péremption)';
   const ag = ctx.agenceOk(ctx.post('agence') || ctx.get('agence'));
+  if (ctx.req.method === 'POST' && ctx.post('annuler')) {
+    ctx.requireEdit('?p=peremption&agence=' + encodeURIComponent(ag));
+    await C.tx(async () => {
+      const p = await C.row('SELECT * FROM t_peremption WHERE idt_peremption = ? AND structures = ?', [Number(ctx.post('annuler')), ag]);
+      if (!p) return;
+      const s = await C.row('SELECT refarticles FROM t_stock WHERE codearticles = ? AND structures = ?', [p.codearticles, ag]);
+      if (s) await C.stockMove(ag, s.refarticles, Number(p.quantitesorti));
+      await C.q('DELETE FROM t_peremption WHERE idt_peremption = ?', [p.idt_peremption]);
+    });
+    ctx.flash('Retrait annulé : la quantité est remise en stock.');
+    ctx.redirect('?p=peremption&agence=' + encodeURIComponent(ag));
+  }
   if (ctx.req.method === 'POST') {
     let lines = []; try { lines = JSON.parse(ctx.post('lignes', '[]')); } catch {}
     if (!lines.length) { ctx.flash('Ajoutez au moins un article à retirer.', 'err'); ctx.redirect('?p=peremption'); }
@@ -30,8 +42,8 @@ module.exports = async ctx => {
   <div class="grid-tools"><button type="button" class="btn sm red" id="rm">− Retirer la ligne</button></div>
   <div class="tbl-wrap"><table class="tbl" id="grid"><thead></thead><tbody></tbody></table></div>
   <div class="actions"><button class="btn" style="background:#0000E6">Enregistrer</button></div></form>
-<div class="card"><h2>Derniers retraits</h2><div class="tbl-wrap"><table class="tbl grey"><thead><tr><th>Date</th><th>Article</th><th class="r">Qté retirée</th><th class="r">Reste</th><th>Motif</th><th>Opérateur</th></tr></thead><tbody>
-${hist.map(h => `<tr><td>${C.dfr(h.dateoperation)}</td><td>${e(h.libarticles)}</td><td class="r">${qty(h.quantitesorti)}</td><td class="r">${qty(h.quantiterestant)}</td><td>${e(h.motif)}</td><td>${e(h.operateur)}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">Aucun retrait enregistré.</td></tr>'}</tbody></table></div></div>
+<div class="card"><h2>Derniers retraits</h2><div class="tbl-wrap"><table class="tbl grey"><thead><tr><th>Date</th><th>Article</th><th class="r">Qté retirée</th><th class="r">Reste</th><th>Motif</th><th>Opérateur</th>${ctx.canEdit() ? '<th></th>' : ''}</tr></thead><tbody>
+${hist.map(h => `<tr><td>${C.dfr(h.dateoperation)}</td><td>${e(h.libarticles)}</td><td class="r">${qty(h.quantitesorti)}</td><td class="r">${qty(h.quantiterestant)}</td><td>${e(h.motif)}</td><td>${e(h.operateur)}</td>${ctx.canEdit() ? `<td class="r"><form method="post" data-confirm="delete">${ctx.csrfField()}<input type="hidden" name="agence" value="${e(ag)}"><button class="btn sm red" name="annuler" value="${h.idt_peremption}">Annuler</button></form></td>` : ''}</tr>`).join('') || '<tr><td colspan="7" class="empty">Aucun retrait enregistré.</td></tr>'}</tbody></table></div></div>
 <script>
 (function(){function v(id){return document.getElementById(id);}
   var cur=null,g=new KFN.Lines(v('grid'),{input:v('lignes'),key:'ref',cols:[{k:'ref',label:'Référence'},{k:'lib',label:'Articles'},{k:'stk',label:'Quantités en stock',cls:'r',fmt:KFN.fmt},{k:'qte',label:'Quantité retirée',cls:'r',fmt:KFN.fmt},{k:'reste',label:'Reste en stock',cls:'r',fmt:KFN.fmt},{k:'unite',label:'Unité valeur'},{k:'motif',label:'Motif'}]});

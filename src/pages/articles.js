@@ -5,6 +5,7 @@ module.exports = async ctx => {
   if (ctx.req.method === 'POST') {
     const id = Number(ctx.post('id')) || 0;
     const d = { fam: ctx.post('famille'), ref: ctx.post('ref').toUpperCase(), lib: ctx.post('lib').toUpperCase(), u: ctx.post('unite') || 'Unité', pa: Math.round(num(ctx.post('pa'))), pv: Math.round(num(ctx.post('pv'))), pp: Math.round(num(ctx.post('pp'))) };
+    if (ctx.post('del') || id) ctx.requireEdit('?p=articles');
     if (ctx.post('del')) {
       const a = await C.row('SELECT * FROM t_articles WHERE idt_articles = ?', [Number(ctx.post('del'))]);
       if (a && Number(await C.val('SELECT COUNT(*) FROM t_lignecmde WHERE refarticles = ?', [a.refarticles]))) ctx.flash('Article déjà vendu : suppression impossible.', 'err');
@@ -25,7 +26,7 @@ module.exports = async ctx => {
     });
     ctx.redirect('?p=articles');
   }
-  const edit = ctx.get('id') ? await C.row('SELECT * FROM t_articles WHERE idt_articles = ?', [Number(ctx.get('id'))]) : null;
+  const edit = ctx.get('id') && ctx.canEdit() ? await C.row('SELECT * FROM t_articles WHERE idt_articles = ?', [Number(ctx.get('id'))]) : null;
   const fams = (await C.rows('SELECT libellefa FROM t_famille ORDER BY libellefa')).map(r => r.libellefa);
   const list = await C.rows('SELECT * FROM t_articles ORDER BY libarticles');
   return `<h1 class="page-title">${edit ? 'Modification article' : 'Enregistrement articles'}</h1>
@@ -42,8 +43,8 @@ module.exports = async ctx => {
 <h1 class="page-title">Listes des articles (${list.length})</h1>
 <div class="card"><div class="row" style="margin-bottom:.7rem"><div class="f"><input placeholder="Rechercher un article, une référence, une famille…" data-filter="#ta"></div>
 <button class="btn ghost" data-export="#ta" data-name="articles">Exporter (Excel)</button></div>
-<div class="tbl-wrap"><table class="tbl grey" id="ta"><thead><tr><th>Famille</th><th>Référence</th><th>Libellé</th><th>Unité</th><th class="r">Prix achat</th><th class="r">Prix vente</th><th class="r">Prix promo</th><th></th></tr></thead><tbody>
+<div class="tbl-wrap"><table class="tbl grey" id="ta"><thead><tr><th>Famille</th><th>Référence</th><th>Libellé</th><th>Unité</th><th class="r">Prix achat</th><th class="r">Prix vente</th><th class="r">Prix promo</th>${ctx.canEdit() ? '<th></th>' : ''}</tr></thead><tbody>
 ${list.map(a => `<tr><td>${e(a.libellefa)}</td><td>${e(a.refarticles)}</td><td>${e(a.libarticles)}</td><td>${e(a.unitevaleur)}</td><td class="r">${money(a.prixachat)}</td><td class="r">${money(a.prixvente)}</td><td class="r">${money(a.prixpromo)}</td>
-<td class="r" style="white-space:nowrap"><a class="btn sm" href="/gestion?p=articles&id=${a.idt_articles}">Modifier</a> <form method="post" style="display:inline" data-confirm="delete">${ctx.csrfField()}<button class="btn red sm" name="del" value="${a.idt_articles}">×</button></form></td></tr>`).join('')}
+${ctx.canEdit() ? `<td class="r" style="white-space:nowrap"><a class="btn sm" href="/gestion?p=articles&id=${a.idt_articles}">Modifier</a> <form method="post" style="display:inline" data-confirm="delete">${ctx.csrfField()}<button class="btn red sm" name="del" value="${a.idt_articles}">Supprimer</button></form></td>` : ''}</tr>`).join('')}
 </tbody></table></div></div>`;
 };

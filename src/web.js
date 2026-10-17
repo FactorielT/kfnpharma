@@ -1,6 +1,7 @@
 'use strict';
 const crypto = require('node:crypto');
 const C = require('./core');
+const N = require('./notifs');
 const cfg = require('./config');
 const { e } = C;
 
@@ -40,6 +41,7 @@ function menuVisible(u, m) {
 }
 function pageAllowed(u, page, sub = '') {
   if (page === 'accueil') return true;
+  if (page === 'notifications') return N.concerne(u);
   return MENU.some(m => menuVisible(u, m).some(([k]) => {
     if (page === 'etats' && sub) return k === 'etats&r=' + sub;
     return k.split('&')[0] === page;
@@ -72,6 +74,9 @@ async function buildCtx(req, res) {
     can: roles => C.can(u, roles),
     isSiege: () => C.isSiegeUser(u),
     isSuper: () => C.isSuper(u), isAdmin: () => C.isAdmin(u),
+    /* Modifier / supprimer : Super Admin, Administrateur et Responsable d'agence uniquement */
+    canEdit: () => C.isAdmin(u) || C.level(u) === 'RAG',
+    requireEdit(back) { if (!ctx.canEdit()) { ctx.flash('Seuls le Super Admin, l’Administrateur et le Responsable d’agence peuvent modifier ou supprimer.', 'err'); ctx.redirect(back); } },
     level: () => C.level(u), uname: () => u?.nom_prenoms || '', ustruct: () => u?.structures || '',
   };
   ctx.agences = C.isSiegeUser(u) ? (await C.rows('SELECT nom_structure FROM t_structure ORDER BY estsiege DESC, nom_structure')).map(r => r.nom_structure) : [u?.structures];
@@ -84,7 +89,8 @@ async function buildCtx(req, res) {
 }
 
 /* ---------- Mise en page de l'application ---------- */
-function layout(ctx, page, cur, content) {
+async function layout(ctx, page, cur, content) {
+  const nt = N.concerne(ctx.user) ? await N.liste(ctx.user).catch(() => null) : null;
   const s = ctx.req.session, u = ctx.user;
   const fl = s.flash || []; s.flash = [];
   const dialogs = fl.filter(f => f[0] === 'dialog').map(f => f[1]);
@@ -110,11 +116,15 @@ function layout(ctx, page, cur, content) {
   <button class="burger" aria-label="Menu"><span></span><span></span><span></span></button>
   <a href="/gestion"><img src="/assets/img/logo.png" alt="KFN Pharma"></a>
   <div class="app-head__title">${e(cfg.appTitle)}</div>
+  ${nt ? `<a class="notif-btn" href="/gestion?p=notifications" title="Notifications des pré-commandes" aria-label="Notifications">
+    <span class="nb nb-rouge"${nt.rouge ? '' : ' hidden'}>${N.enveloppe('rouge', 20)}<b id="nbr">${nt.rouge}</b></span>
+    <span class="nb nb-bleu"${nt.bleu ? '' : ' hidden'}>${N.enveloppe('bleu', 20)}<b id="nbb">${nt.bleu}</b></span>
+    <span class="nb nb-vert"${nt.bleu || nt.rouge ? ' hidden' : ''} title="Tout est traité">${N.enveloppe('vert', 20)}</span></a>` : ''}
   <div class="app-head__who"><small>${e(C.dateLongue())}</small><b>${e(u.structures)}</b>Connecté(e) : <strong>${e(u.nom_prenoms)}</strong></div>
   <a class="logout" href="/gestion/logout" title="Se déconnecter" aria-label="Se déconnecter"><svg viewBox="0 0 24 24"><path d="M12 3v9M6.3 6.3a8 8 0 1 0 11.4 0"/></svg></a>
 </div></header>
 <nav class="app-nav" aria-label="Menu principal"><div class="app-nav__in">${nav}</div></nav>
-<main class="main">
+<main class="main"${nt ? ` data-notif="${nt.bleu},${nt.rouge}"` : ''}>
 ${fl.filter(f => f[0] !== 'dialog').map(([t, m]) => `<div class="flash ${e(t)}">${e(m)}</div>`).join('')}
 ${dialogs.length ? `<script>document.addEventListener('DOMContentLoaded',function(){KFN.alert(${JSON.stringify(dialogs.join('\n'))});});</script>` : ''}
 ${content}

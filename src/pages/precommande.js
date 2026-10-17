@@ -2,6 +2,28 @@
 const C = require('../core'); const WA = require('../whatsapp'); const { e, money, num } = C;
 module.exports = async ctx => {
   ctx.title = "Pré-commande d'approvisionnement";
+  if (ctx.req.method === 'POST' && ['supprimer_pre', 'modifier_pre'].includes(ctx.post('action'))) {
+    ctx.requireEdit('?p=precommande');
+    const code = ctx.post('code');
+    const lignes = await C.rows("SELECT * FROM t_precommandeagence WHERE idcmde = ? AND statut = 'EN_ATTENTE'", [code]);
+    if (!lignes.length || !ctx.agences.includes(lignes[0].structures)) { ctx.flash('Pré-commande introuvable ou déjà validée par le siège : elle ne peut plus être modifiée.', 'err'); ctx.redirect('?p=precommande'); }
+    if (ctx.post('action') === 'supprimer_pre') {
+      await C.q("DELETE FROM t_precommandeagence WHERE idcmde = ? AND statut = 'EN_ATTENTE'", [code]);
+      ctx.flash(`Pré-commande ${code} supprimée.`);
+    } else {
+      const qv = ctx.B.q || {}; let n = 0, sup = 0;
+      await C.tx(async () => {
+        for (const l of lignes) {
+          const v = qv['i' + l.idprecommandeagence]; if (v === undefined) continue;
+          const q = num(v);
+          if (q <= 0) { await C.q('DELETE FROM t_precommandeagence WHERE idprecommandeagence = ?', [l.idprecommandeagence]); sup++; }
+          else if (q !== Number(l.qte)) { await C.q('UPDATE t_precommandeagence SET qte = ?, totalvente = ? WHERE idprecommandeagence = ?', [q, Math.round(q * l.pv), l.idprecommandeagence]); n++; }
+        }
+      });
+      ctx.flash(`Pré-commande ${code} modifiée : ${n} quantité(s) changée(s)${sup ? `, ${sup} ligne(s) retirée(s)` : ''}.`);
+    }
+    ctx.redirect('?p=precommande');
+  }
   if (ctx.req.method === 'POST') {
     const ag = ctx.agenceOk(ctx.post('agence'));
     let lines = []; try { lines = JSON.parse(ctx.post('lignes', '[]')); } catch {}
@@ -22,6 +44,8 @@ module.exports = async ctx => {
     ctx.redirect('?p=precommande');
   }
   const ags = ctx.agences, inn = ags.map(() => '?').join(',');
+  const editCode = ctx.get('edit') && ctx.canEdit() ? ctx.get('edit') : '';
+  const editL = editCode ? await C.rows(`SELECT * FROM t_precommandeagence WHERE idcmde = ? AND statut = 'EN_ATTENTE' AND structures IN (${inn}) ORDER BY idprecommandeagence`, [editCode, ...ags]) : [];
   const enCours = await C.rows(`SELECT idcmde, structures, MIN(dateenreg) d, COUNT(*) n, SUM(totalvente) t, statut FROM t_precommandeagence
     WHERE structures IN (${inn}) AND statut IN ('EN_ATTENTE','VALIDE_SIEGE') GROUP BY idcmde, structures, statut ORDER BY d DESC LIMIT 30`, ags);
   return `<h1 class="page-title" style="background:#111;color:#FFE600;font-style:italic">Simulation de commande ou pré-approvisionnement chez KFN Siège</h1>
@@ -37,8 +61,15 @@ module.exports = async ctx => {
   <div class="tbl-wrap"><table class="tbl" id="grid"><thead></thead><tbody></tbody></table></div>
   <div class="row" style="justify-content:center;margin-top:1rem"><div class="f" style="max-width:340px"><label>Valeur de la commande (prix d'achat chez KFN Siège)</label><input id="tot" class="dark-box" readonly value="0"></div></div>
   <div class="actions"><button class="btn" style="background:#0000E6">Enregistrer</button></div></form>
-<div class="card"><h2>Mes pré-commandes en cours</h2><div class="tbl-wrap"><table class="tbl grey"><thead><tr><th>Code</th><th>Agence</th><th>Date</th><th class="r">Lignes</th><th class="r">Valeur</th><th>État</th></tr></thead><tbody>
-${enCours.map(p => `<tr><td>${e(p.idcmde)}</td><td>${e(p.structures)}</td><td>${C.dfr(p.d)}</td><td class="r">${p.n}</td><td class="r">${money(p.t)}</td><td>${p.statut === 'EN_ATTENTE' ? '<span class="badge o">En attente au siège</span>' : '<span class="badge">Validée — à réceptionner</span>'}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">Aucune pré-commande en cours.</td></tr>'}
+${editL.length ? `<form method="post" class="card" data-confirm="modify" style="border:2px solid var(--orange)">${ctx.csrfField()}<input type="hidden" name="action" value="modifier_pre"><input type="hidden" name="code" value="${e(editCode)}">
+  <h2>Modifier la pré-commande ${e(editCode)} — ${e(editL[0].structures)}</h2><p class="hint">Changez les quantités ; mettez 0 pour retirer un article. Possible tant que le siège n'a pas validé.</p>
+  <div class="tbl-wrap"><table class="tbl grey"><thead><tr><th>Référence</th><th>Article</th><th class="r">Prix</th><th class="r">Quantité</th></tr></thead><tbody>
+  ${editL.map(l => `<tr><td>${e(l.refarticles)}</td><td>${e(l.libarticles)}</td><td class="r">${money(l.pv)}</td><td class="edit"><input name="q[i${l.idprecommandeagence}]" value="${l.qte}" inputmode="decimal"></td></tr>`).join('')}</tbody></table></div>
+  <div class="actions"><a class="btn ghost" href="/gestion?p=precommande">Annuler</a><button class="btn green">Modifier</button></div></form>` : ''}
+<div class="card"><h2>Mes pré-commandes en cours</h2><div class="tbl-wrap"><table class="tbl grey"><thead><tr><th>Code</th><th>Agence</th><th>Date</th><th class="r">Lignes</th><th class="r">Valeur</th><th>État</th>${ctx.canEdit() ? '<th></th>' : ''}</tr></thead><tbody>
+${enCours.map(p => `<tr><td>${e(p.idcmde)}</td><td>${e(p.structures)}</td><td>${C.dfr(p.d)}</td><td class="r">${p.n}</td><td class="r">${money(p.t)}</td><td>${p.statut === 'EN_ATTENTE' ? '<span class="badge o">En attente au siège</span>' : '<span class="badge">Validée — à réceptionner</span>'}</td>
+  ${ctx.canEdit() ? `<td class="r" style="white-space:nowrap">${p.statut === 'EN_ATTENTE' ? `<a class="btn sm" href="/gestion?p=precommande&edit=${encodeURIComponent(p.idcmde)}">Modifier</a>
+  <form method="post" style="display:inline" data-confirm="delete">${ctx.csrfField()}<input type="hidden" name="action" value="supprimer_pre"><button class="btn sm red" name="code" value="${e(p.idcmde)}">Supprimer</button></form>` : ''}</td>` : ''}</tr>`).join('') || '<tr><td colspan="7" class="empty">Aucune pré-commande en cours.</td></tr>'}
 </tbody></table></div></div>
 <script>
 (function(){

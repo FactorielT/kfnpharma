@@ -19,6 +19,7 @@ ${list.map(c => `<tr><td><b>${e(c.nom)}</b></td><td>${e(c.codecourt)}</td><td>${
   }
   if (ctx.req.method === 'POST') {
     const id = Number(ctx.post('id')) || 0, nom = ctx.post('nom').toUpperCase();
+    if (ctx.post('del') || id) ctx.requireEdit('?p=clients&agence=' + encodeURIComponent(ag));
     if (ctx.post('del')) {
       const c = await C.row('SELECT * FROM t_client WHERE idt_client = ? AND structures = ?', [Number(ctx.post('del')), ag]);
       if (c && Number(await C.val('SELECT COUNT(*) FROM t_commande WHERE nomprenom = ? AND structures = ?', [c.nomprenom, ag]))) ctx.flash('Ce client a des factures : suppression impossible.', 'err');
@@ -28,7 +29,7 @@ ${list.map(c => `<tr><td><b>${e(c.nom)}</b></td><td>${e(c.codecourt)}</td><td>${
     else { await C.q('INSERT INTO t_client (nomprenom, contact, quartier, email, structures) VALUES (?,?,?,?,?)', [nom, ctx.post('contact'), ctx.post('quartier'), ctx.post('email'), ag]); ctx.flash(`Client ${nom} enregistré.`); }
     ctx.redirect('?p=clients&agence=' + encodeURIComponent(ag));
   }
-  const edit = ctx.get('id') ? await C.row('SELECT * FROM t_client WHERE idt_client = ? AND structures = ?', [Number(ctx.get('id')), ag]) : null;
+  const edit = ctx.get('id') && ctx.canEdit() ? await C.row('SELECT * FROM t_client WHERE idt_client = ? AND structures = ?', [Number(ctx.get('id')), ag]) : null;
   const list = await C.rows('SELECT c.*, (SELECT COALESCE(SUM(reste),0) FROM t_commande k WHERE k.nomprenom = c.nomprenom AND k.structures = c.structures) AS reste FROM t_client c WHERE structures = ? ORDER BY nomprenom', [ag]);
   return `<h1 class="page-title">Enregistrement des clients — ${e(ag)}</h1>
 <div class="card"><form method="post" class="grid g3" ${edit ? 'data-confirm="modify"' : ''}>${ctx.csrfField()}<input type="hidden" name="id" value="${edit?.idt_client || 0}">
@@ -42,8 +43,8 @@ ${list.map(c => `<tr><td><b>${e(c.nom)}</b></td><td>${e(c.codecourt)}</td><td>${
 <h1 class="page-title">Liste des clients — ${e(ag)} (${list.length})</h1>
 <div class="card"><form method="get" action="/gestion" class="row" style="margin-bottom:.7rem"><input type="hidden" name="p" value="clients">
   <div class="f"><select name="agence" data-autosubmit>${ctx.agOptions(ag)}</select></div><div class="f"><input placeholder="Rechercher un client…" data-filter="#tc"></div></form>
-<div class="tbl-wrap"><table class="tbl grey" id="tc"><thead><tr><th>Nom prénoms</th><th>Localité</th><th>Contact</th><th>E-mail</th><th class="r">Reste à payer</th><th></th></tr></thead><tbody>
+<div class="tbl-wrap"><table class="tbl grey" id="tc"><thead><tr><th>Nom prénoms</th><th>Localité</th><th>Contact</th><th>E-mail</th><th class="r">Reste à payer</th>${ctx.canEdit() ? '<th></th>' : ''}</tr></thead><tbody>
 ${list.map(c => `<tr><td><b>${e(c.nomprenom)}</b></td><td>${e(c.quartier)}</td><td>${e(c.contact)}</td><td>${e(c.email)}</td><td class="r ${c.reste > 0 ? 'neg' : ''}">${money(c.reste)}</td>
-<td class="r" style="white-space:nowrap"><a class="btn sm" href="/gestion?p=clients&agence=${encodeURIComponent(ag)}&id=${c.idt_client}">Modifier</a> <form method="post" style="display:inline" data-confirm="delete">${ctx.csrfField()}<input type="hidden" name="agence" value="${e(ag)}"><button class="btn sm red" name="del" value="${c.idt_client}">×</button></form></td></tr>`).join('')}
+${ctx.canEdit() ? `<td class="r" style="white-space:nowrap"><a class="btn sm" href="/gestion?p=clients&agence=${encodeURIComponent(ag)}&id=${c.idt_client}">Modifier</a> <form method="post" style="display:inline" data-confirm="delete">${ctx.csrfField()}<input type="hidden" name="agence" value="${e(ag)}"><button class="btn sm red" name="del" value="${c.idt_client}">Supprimer</button></form></td>` : ''}</tr>`).join('')}
 </tbody></table></div></div>`;
 };

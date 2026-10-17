@@ -3,8 +3,9 @@ const C = require('../core'); const { e, money, qty, num } = C;
 module.exports = async ctx => {
   ctx.title = 'Stocks articles';
   const ag = ctx.agenceOk(ctx.get('agence') || ctx.post('agence'));
-  const prixMode = !!ctx.get('prix') && ctx.can(['GST']);
-  if (ctx.req.method === 'POST' && ctx.can(['GST'])) {
+  const prixMode = !!ctx.get('prix') && ctx.canEdit();
+  if (ctx.req.method === 'POST') {
+    ctx.requireEdit('?p=stocks&agence=' + encodeURIComponent(ag));
     const pa = ctx.B.pa || {}, pv = ctx.B.pv || {}, al = ctx.B.al || {}; let n = 0;
     await C.tx(async () => { for (const k of Object.keys(pa)) n += (await C.q('UPDATE t_stock SET prixachat = ?, prixvente = ?, quantitealerte = ? WHERE idt_stock = ? AND structures = ? AND (prixachat <> ? OR prixvente <> ? OR quantitealerte <> ?)', [Math.round(num(pa[k])), Math.round(num(pv[k])), num(al[k]), Number(k.slice(1)), ag, Math.round(num(pa[k])), Math.round(num(pv[k])), num(al[k])])).rowCount; });
     ctx.flash(`${n} prix modifié(s) pour ${ag}.`);
@@ -18,7 +19,7 @@ module.exports = async ctx => {
   <div class="f"><label>Rechercher</label><input placeholder="Article, référence…" data-filter="#ts"></div>
   <div class="kpi" style="padding:.4rem .8rem"><small>Nombre d'articles</small><b>${list.length}</b></div>
   <div class="kpi b" style="padding:.4rem .8rem"><small>Valeur du stock (prix vente)</small><b>${money(valeur)}</b></div>
-  ${ctx.can(['GST']) ? (prixMode ? `<a class="btn ghost" href="/gestion?p=stocks&agence=${encodeURIComponent(ag)}">Retour</a>` : `<a class="btn" href="/gestion?p=stocks&prix=1&agence=${encodeURIComponent(ag)}">Modifier les prix</a>`) : ''}
+  ${ctx.canEdit() ? (prixMode ? `<a class="btn ghost" href="/gestion?p=stocks&agence=${encodeURIComponent(ag)}">Retour</a>` : `<a class="btn" href="/gestion?p=stocks&prix=1&agence=${encodeURIComponent(ag)}">Modifier les prix</a>`) : ''}
   <button type="button" class="btn ghost" data-export="#ts" data-name="stock-${e(ag)}">Exporter</button></form></div>
 <form method="post" class="card" data-confirm="modify">${ctx.csrfField()}<input type="hidden" name="agence" value="${e(ag)}">
   ${prixMode ? '<p class="hint" style="text-align:center;font-weight:800">Chaque agence a ses propres prix : seuls le prix d\'achat, le prix de vente et la quantité d\'alerte sont modifiables ici.</p>' : ''}

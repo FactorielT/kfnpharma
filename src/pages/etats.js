@@ -30,6 +30,17 @@ const R = {
       quantitestockactuel AS "Stock logiciel", quantitephysique AS "Qté physique", quantiteecart AS "Écart", utilisateur AS "Utilisateur"
     FROM t_inventaire WHERE structures = ? AND dateinventaire BETWEEN ? AND ? ORDER BY dateinventaire DESC, libarticles`, [f.ag, f.d1, f.d2]]],
 };
+/* Détail affiché en touchant une ligne, selon la rubrique */
+const DETAIL = {
+  ventes_jour: (r) => ({ type: 'facture', num: r['N° commande'] }), credits_periode: (r) => ({ type: 'facture', num: r['N° commande'] }),
+  restes_client: (r) => ({ type: 'facture', num: r['N° commande'] }), clients_periode: (r) => ({ type: 'facture', num: r['N° commande'] }),
+  credits45: (r) => ({ type: 'facture', num: r['N° commande'] }), compte_client: (r) => ({ type: 'facture', num: r['N° commande'] }),
+  paiements: (r) => ({ type: 'facture', num: r['N° commande'] }),
+  credits: (r, f) => ({ type: 'client', nom: r['Nom client'], agence: f.ag, credit: 1 }),
+  ca_client: (r, f) => ({ type: 'client', nom: r['Nom prénom'], agence: f.ag, d1: f.d1, d2: f.d2 }),
+  produits: (r, f) => ({ type: 'produit', lib: r['Libellé articles'], agence: f.ag, d1: f.d1, d2: f.d2 }),
+  appros: (r) => ({ type: 'appro', num: r['N° appro'] }),
+};
 module.exports = async ctx => {
   let r = ctx.get('r', 'ventes_jour'); if (!R[r]) r = 'ventes_jour';
   const [title, filters, build, link] = R[r];
@@ -44,8 +55,7 @@ module.exports = async ctx => {
   const sumCols = [...numCols].filter(c => !/Prix|Jours/.test(c));
   const total = c => data.reduce((s, x) => s + Number(x[c] || 0), 0);
   const lc = ag === C.SIEGE ? 'Agence cliente' : 'Client';
-  const href = row => link === 'facture' && row['N° commande'] ? '/gestion/print?t=facture&n=' + encodeURIComponent(row['N° commande'])
-    : (link === 'appro' ? '/gestion/print?t=' + (String(row['N° appro']).startsWith('PRA') ? 'precmd' : 'appro') + '&n=' + encodeURIComponent(row['N° appro']) : null);
+  const href = row => DETAIL[r] ? new URLSearchParams(DETAIL[r](row, f)).toString() : null;
   return `<h1 class="page-title">${e(title)}</h1>
 <div class="card no-print"><form method="get" action="/gestion" class="row"><input type="hidden" name="p" value="etats"><input type="hidden" name="r" value="${e(r)}">
   <div class="f"><label>Agence</label><select name="agence">${ctx.agOptions(ag)}</select></div>
@@ -55,8 +65,9 @@ module.exports = async ctx => {
 <div class="card"><p class="hint" style="margin-top:0">KFN PHARMA — <b>${e(ag)}</b>${needClient && f.cl ? ' — ' + lc.toLowerCase() + ' : <b>' + e(f.cl) + '</b>' : ''}${hasDates ? ' — du ' + C.dfr(f.d1) + ' au ' + C.dfr(f.d2) : ''} — édité le ${C.dfr(C.today())}</p>
   ${sumCols.length && data.length ? `<div class="kpis">${sumCols.slice(0, 4).map(c => `<div class="kpi"><small>${e(c)}</small><b>${money(total(c))}</b></div>`).join('')}</div>` : ''}
   <div class="tbl-wrap"><table class="tbl grey" id="te"><thead><tr>${cols.map(c => `<th class="${numCols.has(c) ? 'r' : ''}">${e(c)}</th>`).join('')}</tr></thead><tbody>
-  ${data.map(row => { const h = href(row); return `<tr${h ? ` data-href="${e(h)}" title="Ouvrir le détail"` : ''}>${cols.map(c => `<td class="${numCols.has(c) ? 'r' : ''}${(c === 'Reste' || c === 'Écart') && row[c] > 0 ? ' neg' : ''}">${numCols.has(c) ? qty(row[c]) : e(row[c])}</td>`).join('')}</tr>`; }).join('')
+  ${data.map(row => { const h = href(row); return `<tr${h ? ` class="click" data-detail="${e(h)}" title="Voir le détail"` : ''}>${cols.map(c => `<td class="${numCols.has(c) ? 'r' : ''}${(c === 'Reste' || c === 'Écart') && row[c] > 0 ? ' neg' : ''}">${numCols.has(c) ? qty(row[c]) : e(row[c])}</td>`).join('')}</tr>`; }).join('')
     || `<tr><td class="empty" colspan="${Math.max(1, cols.length)}">${needClient && !f.cl ? 'Choisissez un ' + lc.toLowerCase() + ' puis cliquez sur « Afficher ».' : 'Aucune donnée sur cette sélection.'}</td></tr>`}</tbody>
   ${data.length && sumCols.length ? `<tfoot><tr>${cols.map((c, i) => `<td class="r">${sumCols.includes(c) ? money(total(c)) : (i === 0 ? 'Total (' + data.length + ')' : '')}</td>`).join('')}</tr></tfoot>` : ''}</table></div>
-  ${link ? '<p class="hint no-print">Touchez une ligne pour ouvrir le détail imprimable.</p>' : ''}</div>`;
+  ${DETAIL[r] ? '<p class="hint no-print">Touchez une ligne pour voir le détail (articles, paiements, factures…).</p>' : ''}</div>
+<script>document.querySelectorAll('tr[data-detail]').forEach(function(tr){tr.addEventListener('click',function(){KFN.details(tr.dataset.detail);});});</script>`;
 };

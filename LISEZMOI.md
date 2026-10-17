@@ -24,6 +24,17 @@ Responsive : ordinateur, tablette et téléphone.
 3. **Réception** — quand l'agence accepte les produits, et/ou en retourne au siège, le siège reçoit un message WhatsApp listant
    les produits acceptés, les produits refusés, la facture du siège émise et ce qu'il reste à traiter.
 
+**Notifications dans l'application (enveloppes)** — en plus de WhatsApp, une enveloppe apparaît en haut de l'écran :
+
+| Enveloppe | Signification |
+|---|---|
+| Bleue | Nouvelle pré-commande reçue (siège) ou nouvelle réponse du siège (agence) : à traiter |
+| Rouge (clignote) | En attente depuis trop longtemps (48 h par défaut, réglable par l'administrateur) |
+| Verte | Traitée (validée par le siège / réceptionnée par l'agence) |
+
+Le chiffre sur l'enveloppe se met à jour toutes les minutes ; un clic ouvre la liste des notifications, chacune menant
+directement à l'écran de traitement.
+
 **Paramétrage : ADMIN → Notifications WhatsApp**
 
 - **Numéros** : numéros du siège (plusieurs possibles) et numéro(s) de chaque agence (aussi modifiables dans *Paramétrage des agences*).
@@ -43,11 +54,37 @@ Responsive : ordinateur, tablette et téléphone.
 - **Journal** : historique de tous les messages (envoyé, en échec avec la raison, à envoyer manuellement), bouton « Renvoyer ».
 - **Adresse de l'application** : si elle est renseignée, un lien direct vers l'écran à traiter est ajouté aux messages.
 
-## 3. Prérequis
+## 3. Modifier et supprimer — qui peut le faire ?
+Seuls le **Super Admin**, l'**Administrateur** et le **Responsable d'agence** voient et peuvent utiliser les boutons
+**Modifier** / **Supprimer** (ou **Annuler**). Les autres profils peuvent saisir, mais pas corriger ni effacer :
+
+| Enregistrement | Modifier | Supprimer / annuler |
+|---|---|---|
+| Familles, articles, fournisseurs, clients | Oui | Oui (si non utilisé) |
+| Prix de vente par agence | Oui | — |
+| Pré-commandes en attente du siège | Quantités | Oui |
+| Factures et pro-forma | Oui | Oui (si aucun paiement) |
+| Paiements de caisse | — | Annuler (caisse non fermée) |
+| Dépenses | Oui | Oui (caisse non fermée) |
+| Fermeture de caisse | — | Rouvrir la caisse |
+| Approvisionnement du dépôt principal | — | Annuler (si le stock le permet) |
+| Retraits pour péremption | — | Annuler (quantité remise en stock) |
+
+Le contrôle est aussi fait par le serveur : un autre profil reçoit un message de refus.
+
+## 4. Détails dans les états
+Dans *Éditions des états*, touchez une ligne pour ouvrir son détail, selon la rubrique :
+- **une facture** (ventes du jour, crédits sur période, restes à payer, clients sur période, crédits de plus de 45 jours, paiements,
+  compte client) : articles vendus, paiements reçus, et bouton Imprimer ;
+- **un client** (bilans crédits, chiffre d'affaires par client) : ses factures, puis le détail de chacune ;
+- **un produit** (bilans produits) : toutes les factures où il a été vendu ;
+- **un approvisionnement** (bilans approvisionnements) : les articles approvisionnés.
+
+## 5. Prérequis
 - **Node.js 18 ou plus** (conseillé : 22 LTS) — https://nodejs.org
 - **PostgreSQL 12 à 17** (local, ou base en ligne : Render, Neon, Supabase, Railway…)
 
-## 4. Installation en local (Windows, macOS, Linux)
+## 6. Installation en local (Windows, macOS, Linux)
 1. Installez Node.js et PostgreSQL. Avec pgAdmin ou `psql`, créez une base vide : `CREATE DATABASE kfnpharma;`
 2. Décompressez le projet, ouvrez un terminal dans le dossier `kfnpharma-node`, puis tapez `npm install` et
    `copy .env.exemple .env` (macOS / Linux : `cp .env.exemple .env`).
@@ -63,7 +100,7 @@ Comptes de départ (mots de passe chiffrés automatiquement à la 1re connexion 
 Commandes utiles : `npm run db:init` (crée les tables si absentes), `npm run db:reset` (**efface tout** et recrée),
 `npm run dev` (redémarrage automatique pendant le développement).
 
-## 5. Mise en ligne
+## 7. Mise en ligne
 **Important : InfinityFree n'exécute pas Node.js** (seulement PHP). Pour cette version, choisissez un hébergeur compatible Node.js ;
 la version PHP/MySQL (KFNPHARMA_InfinityFree.zip) reste disponible pour InfinityFree.
 
@@ -83,7 +120,7 @@ la version PHP/MySQL (KFNPHARMA_InfinityFree.zip) reste disponible pour Infinity
 **Serveur VPS (Ubuntu)** : `docker compose up -d` (fichiers `Dockerfile` et `docker-compose.yml` fournis), ou bien
 Node.js + PostgreSQL installés, `npm ci --omit=dev`, puis `pm2 start server.js --name kfnpharma` derrière Nginx avec HTTPS (Let's Encrypt).
 
-## 6. Variables d'environnement (`.env`)
+## 8. Variables d'environnement (`.env`)
 | Variable | Rôle |
 |---|---|
 | `PORT` | Port HTTP (3000 par défaut) |
@@ -93,7 +130,7 @@ Node.js + PostgreSQL installés, `npm ci --omit=dev`, puis `pm2 start server.js 
 | `SESSION_SECRET` | Phrase secrète des sessions — **à changer** |
 | `SECURE_COOKIES=true` | À activer quand le site est en HTTPS |
 
-## 7. Arborescence
+## 9. Arborescence
 ```
 server.js                 serveur Express (site, connexion, routeur de l'application)
 src/config.js             lecture du .env
@@ -109,7 +146,7 @@ database/schema.sql       structure PostgreSQL (37 tables)
 database/seed.sql         données de départ
 ```
 
-## 8. Profils
+## 10. Profils
 | Profil | Code | Accès |
 |---|---|---|
 | Super Admin | SUP | Tout, toutes les agences |
@@ -120,7 +157,7 @@ database/seed.sql         données de départ
 | Vendeur(se) | VEN | Ventes + consultation |
 | Consultation | CON | États (au siège : aussi les statistiques de toutes les agences) |
 
-## 9. Fonctions
+## 11. Fonctions
 Toutes les fonctions de la version précédente sont reprises : familles, articles, stocks et prix par agence, approvisionnement
 du dépôt principal, circuit pré-commande → validation → réception avec retour au siège, point des appros par année,
 factures et pro-forma, modification, caisse (jour, impayés, dépenses, fermeture, arrêts), 12 états avec dates de début et de fin,
@@ -129,7 +166,7 @@ modification des fichiers façon Excel, importation / exportation Excel avec mod
 questions de confirmation (« Voulez-vous valider l'enregistrement ? », « Voulez-vous modifier cette opération ? »,
 « Voulez-vous supprimer ? Attention ! … ») et messages « Enregistrement / Modification / Suppression réussi(e) ».
 
-## 10. Base de données PostgreSQL
+## 12. Base de données PostgreSQL
 Les noms des tables et des colonnes de l'analyse WinDev sont conservés, **en minuscules** (PostgreSQL ne distingue pas la
 casse sans guillemets) : `T_Stock` → `t_stock`, `RefArticles` → `refarticles`… Les fichiers Excel de l'ancienne version
 peuvent être importés : les noms de colonnes sont reconnus sans tenir compte des majuscules.

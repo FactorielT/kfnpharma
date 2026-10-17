@@ -10,6 +10,12 @@ module.exports = async ctx => {
     C.val('SELECT COALESCE(SUM(montantdepense),0) FROM t_sortieargent WHERE structures = ? AND datedepenses = ?', [ag, date])])).map(Number);
   const cumul = cash + ech + vers, logiciel = cumul - dep;
   const fermee = await C.row('SELECT * FROM t_fermercaisse WHERE structures = ? AND datefermer = ? AND caissefermee = 1', [ag, date]);
+  if (ctx.req.method === 'POST' && ctx.post('rouvrir')) {
+    ctx.requireEdit(`?p=fermeture_caisse&agence=${encodeURIComponent(ag)}&date=${date}`);
+    await C.q('DELETE FROM t_fermercaisse WHERE structures = ? AND datefermer = ?', [ag, date]);
+    ctx.flash(`Caisse du ${C.dfr(date)} rouverte : vous pouvez corriger les paiements et dépenses, puis l'arrêter de nouveau.`);
+    ctx.redirect(`?p=fermeture_caisse&agence=${encodeURIComponent(ag)}&date=${date}`);
+  }
   if (ctx.req.method === 'POST') {
     if (fermee) ctx.flash(`La caisse du ${C.dfr(date)} est déjà fermée.`, 'err');
     else if (ctx.post('physique') === '') ctx.flash('Saisissez le montant réel compté dans la caisse.', 'err');
@@ -30,6 +36,6 @@ module.exports = async ctx => {
   <div class="f span2"><label>Valeur de la caisse du jour</label><input readonly class="dark-box" value="${money(logiciel)}"></div>
   <div class="f span2"><label>Montant réel physique</label><input name="physique" id="phys" class="big" inputmode="numeric" ${fermee ? `readonly value="${money(fermee.valeurphysiquecaissejour)}"` : ''}></div>
   <div class="f span2"><label>Écart</label><input id="ecart" readonly class="big" value="${fermee ? money(fermee.ecart) : ''}"></div></div>
-  ${fermee ? `<div class="flash ok" style="margin-top:1rem">Caisse fermée par ${e(fermee.utilisateur)}.</div>` : '<div class="actions"><a class="btn ghost" href="/gestion">Retour</a><button class="btn orange">Arrêter la caisse</button></div>'}</form></div>
+  ${fermee ? `<div class="flash ok" style="margin-top:1rem">Caisse fermée par ${e(fermee.utilisateur)}.</div>${ctx.canEdit() ? `<div class="actions"><button class="btn orange" name="rouvrir" value="1" data-confirm="Rouvrir la caisse du ${C.dfr(date)} ? Elle devra être arrêtée de nouveau." data-kind="modify">Rouvrir la caisse</button></div>` : ''}` : '<div class="actions"><a class="btn ghost" href="/gestion">Retour</a><button class="btn orange">Arrêter la caisse</button></div>'}</form></div>
 <script>var p=document.getElementById('phys');if(p&&!p.readOnly)p.addEventListener('input',function(){document.getElementById('ecart').value=KFN.fmt(KFN.num(p.value)-${logiciel});});</script>`;
 };

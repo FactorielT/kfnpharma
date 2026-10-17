@@ -206,3 +206,21 @@ table.xl{border-collapse:collapse;font-size:.84rem;min-width:100%}
 .tile:hover{background:#244C9E}
 .tile.cur{background:#E6E6E6;color:#111;border:1px solid #bbb}
 .tile small{display:block;font:600 .75rem var(--font);opacity:.8;text-transform:none;margin-top:.2rem}
+
+/* Notifications (enveloppes) */
+.notif-btn{display:flex;gap:.35rem;align-items:center;text-decoration:none;padding:.3rem .5rem;border-radius:10px;border:1px solid var(--line);background:#fff}
+.notif-btn:hover{background:#F3F6F4}
+.notif-btn .nb{position:relative;display:inline-flex;align-items:center}
+.notif-btn .nb[hidden]{display:none}
+.notif-btn svg{width:24px;height:24px}
+.notif-btn .nb b{position:absolute;top:-8px;right:-9px;min-width:18px;height:18px;border-radius:9px;font:800 .7rem/18px var(--font);text-align:center;color:#fff;padding:0 4px}
+.notif-btn .nb-rouge b{background:#D32F2F}.notif-btn .nb-bleu b{background:#1F6FD1}
+.notif-btn .nb-rouge svg{animation:pulse 1.6s infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
+.notif-list{display:grid;gap:.6rem}
+.notif{display:flex;gap:.9rem;align-items:center;padding:.8rem 1rem;border-radius:12px;border:1px solid var(--line);text-decoration:none;color:inherit;background:#fff}
+.notif:hover{background:#F7FAF8}
+.notif-bleu{border-left:6px solid #1F6FD1}.notif-rouge{border-left:6px solid #D32F2F;background:#FFF7F7}.notif-vert{border-left:6px solid #2E7D32;opacity:.85}
+.notif__txt{flex:1;min-width:0;display:grid}.notif__txt span{color:var(--ink)}.notif__txt small{color:var(--muted)}
+@media (max-width:600px){.notif{flex-wrap:wrap}.notif .badge{margin-left:2.8rem}}
+@media print{.notif-btn{display:none}}
