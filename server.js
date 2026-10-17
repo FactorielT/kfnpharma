@@ -126,5 +126,6 @@ app.use((req, res) => res.status(404).type('html').send('<!doctype html><meta ch
 process.on('unhandledRejection', err => console.error('Erreur non gérée :', err));
 C.initDb().then(created => {
   if (created) console.log('Base de données initialisée (tables et données de départ créées).');
-  app.listen(cfg.port, () => console.log(`KFN PHARMA en ligne sur http://localhost:${cfg.port}`));
+  const PORT = process.env.PORT || cfg.port || 3000;
+app.listen(PORT, () => console.log(`KFN PHARMA en ligne sur le port ${PORT}`));
 }).catch(err => { console.error('Connexion PostgreSQL impossible :', err.message); process.exit(1); });
