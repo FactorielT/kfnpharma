@@ -1,0 +1,26 @@
+{
+  "name": "kfnpharma",
+  "version": "2.0.0",
+  "description": "KFN PHARMA — site internet et application de gestion des ventes et des stocks (Node.js + PostgreSQL)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "db:init": "node scripts/init-db.js",
+    "db:reset": "node scripts/init-db.js --reset"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "connect-pg-simple": "^10.0.0",
+    "exceljs": "^4.4.0",
+    "express": "^4.22.3",
+    "express-session": "^1.19.0",
+    "multer": "^2.4.0",
+    "pg": "^8.23.1"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  }
+}

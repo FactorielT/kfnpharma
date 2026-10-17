@@ -1,0 +1,15 @@
+# Lancement complet en local ou sur un serveur : docker compose up -d   →  http://localhost:3000
+services:
+  db:
+    image: postgres:16-alpine
+    environment: { POSTGRES_DB: kfnpharma, POSTGRES_USER: kfn, POSTGRES_PASSWORD: kfn }
+    volumes: [ "pgdata:/var/lib/postgresql/data" ]
+    restart: unless-stopped
+  app:
+    build: .
+    ports: [ "3000:3000" ]
+    environment: { PGHOST: db, PGDATABASE: kfnpharma, PGUSER: kfn, PGPASSWORD: kfn, SESSION_SECRET: changez-cette-phrase }
+    depends_on: [ db ]
+    restart: unless-stopped
+volumes:
+  pgdata:
