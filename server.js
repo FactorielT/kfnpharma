@@ -27,7 +27,8 @@ app.use(express.json({ limit: '5mb' }));
 app.use(session({
   store: new PgSession({ pool: C.pool, tableName: 'session', createTableIfMissing: true }),
   secret: cfg.sessionSecret, resave: false, saveUninitialized: false, name: 'kfn.sid',
-  cookie: { httpOnly: true, sameSite: 'lax', secure: cfg.secureCookies, maxAge: 12 * 3600 * 1000 },
+  // Cookie de session du navigateur (sans durée) : fermer le navigateur déconnecte ; voir aussi l'inactivité ci-dessous
+  cookie: { httpOnly: true, sameSite: 'lax', secure: cfg.secureCookies },
 }));
 const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
@@ -39,7 +40,7 @@ app.get('/recherche', wrap(site.recherche));
 app.get('/sante', async (req, res) => { try { await C.val('SELECT 1'); res.json({ ok: true }); } catch (err) { res.status(500).json({ ok: false }); } });
 
 /* ---------- Connexion ---------- */
-function loginPage(err = '', login = '') {
+function loginPage(err = '', login = '', info = '') {
   return `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Authentification — KFN Pharma</title><meta name="theme-color" content="#1B4D24"><link rel="icon" href="/assets/img/logo.png">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
@@ -47,14 +48,22 @@ function loginPage(err = '', login = '') {
 <main class="login-page"><form class="login" method="post" action="/gestion/login" autocomplete="on">
   <img src="/assets/img/logo.png" alt="KFN Pharma"><h1>Authentification utilisateur</h1>
   <p class="sub">Utilisez vos paramètres de connexion pour vous identifier.</p>
-  ${err ? `<div class="flash err">${e(err)}</div>` : ''}
+  ${err ? `<div class="flash err">${e(err)}</div>` : ''}${info ? `<div class="flash info">${e(info)}</div>` : ''}
   <div class="f"><label for="login">Login</label><input id="login" name="login" required autofocus autocapitalize="none" value="${e(login)}"></div>
   <div class="f"><label for="mdp">Mot de passe</label><input id="mdp" type="password" name="mot_de_passe" required autocomplete="current-password"></div>
   <button class="btn orange block" type="submit">Connexion</button>
   <a class="back" href="/">← Retour au site internet</a>
 </form></main></body></html>`;
 }
-app.get('/gestion/login', (req, res) => req.session.user ? res.redirect('/gestion') : res.type('html').send(loginPage()));
+/* L'écran de connexion s'affiche TOUJOURS : arriver ici (bouton « Espace Connexion » du site, déconnexion,
+   session expirée) ferme la session éventuellement ouverte, et il faut s'authentifier pour entrer. */
+const MSG_LOGIN = { expire: 'Votre session a expiré après une période d’inactivité. Veuillez vous authentifier de nouveau.', deconnecte: 'Vous êtes déconnecté(e). À bientôt !' };
+app.get('/gestion/login', (req, res) => {
+  const info = MSG_LOGIN[req.query.m] || '';
+  const show = () => res.set('Cache-Control', 'no-store').type('html').send(loginPage('', '', info));
+  if (req.session.user) return req.session.regenerate(() => show());
+  show();
+});
 app.post('/gestion/login', wrap(async (req, res) => {
   const s = req.session, login = String(req.body.login || '').trim(), pass = String(req.body.mot_de_passe || '');
   s.tries = s.tries || 0;
@@ -72,18 +81,31 @@ app.post('/gestion/login', wrap(async (req, res) => {
     delete u.mot_de_passe;
     req.session.regenerate(err => {
       if (err) return res.type('html').send(loginPage('Erreur de session, réessayez.'));
-      req.session.user = u;
+      req.session.user = u; req.session.lastSeen = Date.now();
       C.q('UPDATE utilisateurs SET derniere_cnx = NOW() WHERE idutilisateurs = ?', [u.idutilisateurs]).catch(() => {});
       req.session.save(() => res.redirect('/gestion'));
     });
   } catch (err) { console.error(err); res.type('html').send(loginPage('Connexion à la base impossible. Vérifiez la configuration.', login)); }
 }));
-app.get('/gestion/logout', (req, res) => req.session.destroy(() => res.redirect('/gestion/login')));
+app.get('/gestion/logout', (req, res) => req.session.destroy(() => res.redirect('/gestion/login?m=deconnecte')));
+app.get('/gestion/guide', (req, res) => {
+  if (!req.session.user) return res.redirect('/gestion/login');
+  const pdf = path.join(__dirname, 'LISEZMOI_KFNPHARMA_NODE.pdf');
+  if (fs.existsSync(pdf)) return res.type('pdf').sendFile(pdf);
+  res.type('text/plain; charset=utf-8').send(fs.existsSync(path.join(__dirname, 'LISEZMOI.md')) ? fs.readFileSync(path.join(__dirname, 'LISEZMOI.md'), 'utf8') : 'Guide indisponible.');
+});
 app.get('/gestion/manifest.json', (req, res) => res.json({ name: 'KFN Pharma Gestion', short_name: 'KFN Gestion', start_url: '/gestion', display: 'standalone', background_color: '#EFF5F1', theme_color: '#E07F16', icons: [{ src: '/assets/img/logo.png', sizes: '243x121', type: 'image/png' }] }));
 
 /* ---------- Application (connexion obligatoire) ---------- */
+const IDLE_MS = Math.max(5, Number(process.env.SESSION_IDLE_MINUTES || 30)) * 60000;
 function requireLogin(req, res, next) {
-  if (req.session.user) return next();
+  res.set('Cache-Control', 'no-store');      // le bouton « Précédent » ne réaffiche pas l'application après déconnexion
+  const s = req.session;
+  if (s.user && s.lastSeen && Date.now() - s.lastSeen > IDLE_MS) {
+    return s.destroy(() => (req.get('x-requested-with') || req.path.startsWith('/gestion/api')) ? res.status(401).json({ error: 'Session expirée' }) : res.redirect('/gestion/login?m=expire'));
+  }
+  // l'actualisation automatique des notifications ne compte pas comme une activité
+  if (s.user) { if (req.query.a !== 'notifs') s.lastSeen = Date.now(); return next(); }
   if (req.get('x-requested-with') || req.path.startsWith('/gestion/api')) return res.status(401).json({ error: 'Session expirée' });
   res.redirect('/gestion/login');
 }

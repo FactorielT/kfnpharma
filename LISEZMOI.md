@@ -5,6 +5,16 @@ Site internet (slider 3D, services, activités, équipe, contact, recherche de p
 Responsive : ordinateur, tablette et téléphone.
 
 ## 1. Organisation des menus
+L'application s'affiche avec un **menu latéral vert** (rubriques par section : Siège, Stocks, Ventes, Caisse, Éditions,
+Configuration ; chaque rubrique s'ouvre d'un clic ; le bouton rond réduit le menu aux icônes) et une **barre du haut**
+(profil et agence, bouton *Guide*, cloche des notifications, initiales de l'utilisateur avec *Se déconnecter*).
+Sur téléphone, le menu s'ouvre avec le bouton ☰.
+
+**Connexion** : l'écran d'authentification s'affiche à chaque fois qu'on clique sur *Espace Connexion* depuis le site
+(une session encore ouverte est alors fermée). La session se ferme aussi à la fermeture du navigateur, après
+30 minutes sans activité (réglable avec `SESSION_IDLE_MINUTES`) et par *Se déconnecter* ; le bouton « Précédent »
+ne réaffiche pas l'application après une déconnexion.
+
 - **Agence Siège** : familles, articles, enregistrement du stock, appro du dépôt principal, appro des agences, compte des agences, objectifs, histogramme.
 - **Gestion de stocks** : pré-commande, réception des appros, stocks, inventaires, péremption.
 - **Ventes articles** : factures / pro-forma, modification, clients, **prix de vente par agence**.
@@ -175,6 +185,7 @@ Node.js + PostgreSQL installés, `npm ci --omit=dev`, puis `pm2 start server.js 
 | `PGSSL=true` | Base distante qui exige SSL |
 | `SESSION_SECRET` | Phrase secrète des sessions — **à changer** |
 | `SECURE_COOKIES=true` | À activer quand le site est en HTTPS |
+| `SESSION_IDLE_MINUTES` | Déconnexion automatique après N minutes sans activité (30 par défaut, 5 minimum) |
 
 ## 13. Arborescence
 ```

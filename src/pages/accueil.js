@@ -14,8 +14,9 @@ module.exports = async ctx => {
   const pend = ctx.isSiege() ? await C.val("SELECT COUNT(DISTINCT idcmde) FROM t_precommandeagence WHERE statut = 'EN_ATTENTE'") : 0;
   const msgs = ctx.isAdmin() ? await C.val('SELECT COUNT(*) FROM site_messages_contact WHERE lu = 0') : 0;
   const kpiLink = (cls, href, t, v) => `<a class="kpi ${cls}" href="${href}" style="text-decoration:none;color:inherit"><small>${t}</small><b>${v}</b></a>`;
-  return `<div class="card home-hero"><div><h2>Bonjour ${e(ctx.uname())}</h2>
-    <p class="hint">Agence : <b>${e(ctx.ustruct())}</b> · Profil : ${e(C.NIVEAUX[ctx.level()] || ctx.level())}${ctx.ustruct() === C.SIEGE ? ' · <b>Les clients du siège sont les agences</b>' : ''}</p>
+  return `<div class="card home-hero welcome"><div><h2><svg class="ico" viewBox="0 0 24 24" style="width:26px;height:26px"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Accueil</h2>
+    <p>Bienvenue, <b>${e(ctx.uname())}</b>. — Agence : <b>${e(ctx.ustruct())}</b> · Profil : ${e(C.NIVEAUX[ctx.level()] || ctx.level())}</p>
+    <p class="hint">Utilisez le menu à gauche pour accéder aux modules de l'application.</p>
     <div class="actions" style="justify-content:flex-start">
       ${ctx.pageAllowed('facture') ? '<a class="btn orange" href="/gestion?p=facture">Nouvelle facture</a>' : ''}
       ${ctx.pageAllowed('caisse_jour') ? '<a class="btn green" href="/gestion?p=caisse_jour">Encaisser</a>' : ''}

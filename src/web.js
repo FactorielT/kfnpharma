@@ -93,47 +93,79 @@ async function buildCtx(req, res) {
 }
 
 /* ---------- Mise en page de l'application ---------- */
+/* ---------- Icônes du menu (traits, 24×24) ---------- */
+const ICO = {
+  accueil: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+  notif: '<path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+  siege: '<path d="M4 21V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v16"/><path d="M15 9h4a1 1 0 0 1 1 1v11M8 8h3M8 12h3M8 16h3M3 21h18"/>',
+  stocks: '<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
+  ventes: '<path d="M6 3h12l1 4H5z"/><path d="M5 7v13a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7"/><path d="M9 11a3 3 0 0 0 6 0"/>',
+  caisse: '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M16 15h2"/>',
+  etats: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>',
+  admin: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 7 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.6 1.6 0 0 0 3.5 14H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 7a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.6 1.6 0 0 0 10 3.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/>',
+  chev: '<path d="m9 6 6 6-6 6"/>', guide: '<path d="M4 4h6a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H4zM20 4h-6a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h6z"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
+  out: '<path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l5-5-5-5M15 12H3"/>', menu: '<path d="M4 6h16M4 12h16M4 18h16"/>', col: '<circle cx="12" cy="12" r="9"/><path d="m14 9-3 3 3 3"/>',
+};
+const ico = (k, cls = '') => `<svg class="ico ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICO[k] || ICO.etats}</svg>`;
+const SECTION = { siege: ['Siège', 'Agence Siège'], stocks: ['Stocks', 'Gestion de stocks'], ventes: ['Ventes', 'Ventes articles'], caisse: ['Caisse', 'Paiement caisse'], etats: ['Éditions', 'Éditions des états'], admin: ['Configuration', 'Administration'] };
+
 async function layout(ctx, page, cur, content) {
   const nt = N.concerne(ctx.user) ? await N.liste(ctx.user).catch(() => null) : null;
   const s = ctx.req.session, u = ctx.user;
   const fl = s.flash || []; s.flash = [];
   const dialogs = fl.filter(f => f[0] === 'dialog').map(f => f[1]);
-  const nav = MENU.map(m => {
-    if (m.page) return `<div class="nav-item${page === m.page ? ' active' : ''}"><a href="/gestion?p=${m.page}">${e(m.label)}</a></div>`;
-    const it = menuVisible(u, m); if (!it.length) return '';
-    const act = it.some(([k]) => k === cur);
-    return `<div class="nav-item${act ? ' active' : ''}${m.key === 'admin' ? ' nav-admin' : ''}"><button type="button" aria-expanded="false">${e(m.label)}</button><div class="nav-sub">${
-      it.map(([k, l]) => `<a href="/gestion?p=${e(k)}"${k === cur ? ' class="cur"' : ''}>${e(l)}</a>`).join('')}</div></div>`;
-  }).join('');
+  const lien = (href, label, icon, actif) => `<a class="sb-link${actif ? ' on' : ''}" href="${href}" title="${e(label)}">${ico(icon)}<span>${e(label)}</span></a>`;
+  let side = lien('/gestion', 'Accueil', 'accueil', page === 'accueil');
+  if (nt) side += `<a class="sb-link${page === 'notifications' ? ' on' : ''}" href="/gestion?p=notifications" title="Notifications">${ico('notif')}<span>Notifications</span>${nt.rouge + nt.bleu ? `<em class="sb-badge ${nt.rouge ? 'r' : ''}">${nt.rouge + nt.bleu}</em>` : ''}</a>`;
+  for (const m of MENU) {
+    if (m.page) continue;
+    const it = menuVisible(u, m); if (!it.length) continue;
+    const act = it.some(([k]) => k === cur), [sec, lab] = SECTION[m.key] || [m.label, m.label];
+    side += `<div class="sb-sec">${e(sec)}</div><div class="sb-grp${act ? ' open' : ''}"><button type="button" class="sb-link sb-tog" aria-expanded="${act}" title="${e(lab)}">${ico(m.key)}<span>${e(lab)}</span>${ico('chev', 'chev')}</button>
+      <div class="sb-sub">${it.map(([k, l]) => `<a href="/gestion?p=${e(k)}"${k === cur ? ' class="on"' : ''}>${e(l)}</a>`).join('')}</div></div>`;
+  }
+  const ini = String(u.nom_prenoms || u.login || '?').trim().split(/\s+/).map(x => x[0]).slice(0, 2).join('').toUpperCase();
+  const tot = nt ? nt.bleu + nt.rouge : 0;
   return `<!DOCTYPE html>
 <html lang="fr"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="csrf" content="${s.csrf}">
 <title>${e(ctx.title || 'Gestion')} — KFN Pharma</title>
-<meta name="theme-color" content="#E07F16">
+<meta name="theme-color" content="#14703A">
 <link rel="icon" href="/assets/img/logo.png"><link rel="manifest" href="/gestion/manifest.json">
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/css/app.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/app.css"><link rel="stylesheet" href="/assets/css/shell.css">
+<script>try{if(localStorage.getItem('kfn-sb')==='1')document.documentElement.classList.add('sb-mini')}catch(e){}</script>
 <script src="/assets/js/app.js"></script>
-</head><body>
-<header class="app-head"><div class="app-head__in">
-  <button class="burger" aria-label="Menu"><span></span><span></span><span></span></button>
-  <a href="/gestion"><img src="/assets/img/logo.png" alt="KFN Pharma"></a>
-  <div class="app-head__title">${e(cfg.appTitle)}</div>
-  ${nt ? `<a class="notif-btn" href="/gestion?p=notifications" title="Notifications des pré-commandes" aria-label="Notifications">
-    <span class="nb nb-rouge"${nt.rouge ? '' : ' hidden'}>${N.enveloppe('rouge', 20)}<b id="nbr">${nt.rouge}</b></span>
-    <span class="nb nb-bleu"${nt.bleu ? '' : ' hidden'}>${N.enveloppe('bleu', 20)}<b id="nbb">${nt.bleu}</b></span>
-    <span class="nb nb-vert"${nt.bleu || nt.rouge ? ' hidden' : ''} title="Tout est traité">${N.enveloppe('vert', 20)}</span></a>` : ''}
-  <div class="app-head__who"><small>${e(C.dateLongue())}</small><b>${e(u.structures)}</b>Connecté(e) : <strong>${e(u.nom_prenoms)}</strong></div>
-  <a class="logout" href="/gestion/logout" title="Se déconnecter" aria-label="Se déconnecter"><svg viewBox="0 0 24 24"><path d="M12 3v9M6.3 6.3a8 8 0 1 0 11.4 0"/></svg></a>
-</div></header>
-<nav class="app-nav" aria-label="Menu principal"><div class="app-nav__in">${nav}</div></nav>
-<main class="main"${nt ? ` data-notif="${nt.bleu},${nt.rouge}"` : ''}>
+</head><body class="shell">
+<aside class="sb" id="sb" aria-label="Menu principal">
+  <div class="sb-head"><a class="sb-logo" href="/gestion"><img src="/assets/img/logo.png" alt="KFN Pharma"></a>
+    <button type="button" class="sb-col" id="sbcol" title="Réduire / agrandir le menu" aria-label="Réduire le menu">${ico('col')}</button></div>
+  <nav class="sb-nav">${side}</nav>
+  <div class="sb-foot">${e(cfg.appTitle)}</div>
+</aside>
+<div class="sb-veil" id="sbveil"></div>
+<div class="shell-main">
+  <header class="tb">
+    <button type="button" class="tb-burger" id="sbopen" aria-label="Ouvrir le menu">${ico('menu')}</button>
+    <div class="tb-date">${e(C.dateLongue())}</div>
+    <div class="tb-right">
+      <div class="tb-role" title="Profil et agence">${ico('gear')}<div><b>${e(C.NIVEAUX[C.level(u)] || C.level(u))}</b><small>${e(u.structures)}</small></div></div>
+      <a class="tb-btn" href="/gestion/guide" target="_blank" rel="noopener">${ico('guide')}<span>Guide</span></a>
+      ${nt ? `<a class="tb-bell" href="/gestion?p=notifications" title="Notifications des pré-commandes" aria-label="Notifications">${ico('notif')}<b id="nbell" class="${nt.rouge ? 'r' : ''}"${tot ? '' : ' hidden'}>${tot}</b></a>` : ''}
+      <div class="tb-user"><button type="button" class="tb-av" id="avbtn" aria-haspopup="true" aria-expanded="false" title="${e(u.nom_prenoms)}">${e(ini)}<i></i></button>
+        <div class="tb-menu" id="avmenu" hidden><div class="tb-menu__who"><b>${e(u.nom_prenoms)}</b><small>${e(u.login)} · ${e(C.NIVEAUX[C.level(u)] || '')}</small><small>${e(u.structures)}</small></div>
+          <a href="/gestion/logout">${ico('out')}Se déconnecter</a></div></div>
+    </div>
+  </header>
+  <main class="main"${nt ? ` data-notif="${nt.bleu},${nt.rouge}"` : ''}>
 ${fl.filter(f => f[0] !== 'dialog').map(([t, m]) => `<div class="flash ${e(t)}">${e(m)}</div>`).join('')}
 ${dialogs.length ? `<script>document.addEventListener('DOMContentLoaded',function(){KFN.alert(${JSON.stringify(dialogs.join('\n'))});});</script>` : ''}
 ${content}
-</main>
-<footer class="app-foot">KFN Pharma — ${e(cfg.appTitle)} © ${new Date().getFullYear()}</footer>
+  </main>
+  <footer class="shell-foot">© ${new Date().getFullYear()} KFN PHARMA — ${e(cfg.appTitle)}</footer>
+</div>
 </body></html>`;
 }
 

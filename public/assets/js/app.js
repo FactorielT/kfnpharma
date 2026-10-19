@@ -224,6 +224,21 @@
 
   /* ---------- Comportements génériques ---------- */
   document.addEventListener('DOMContentLoaded', function () {
+    // Menu latéral : groupes repliables, menu réduit, menu mobile, menu utilisateur
+    $$('.sb-tog').forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (document.documentElement.classList.contains('sb-mini') && window.innerWidth > 980) { document.documentElement.classList.remove('sb-mini'); try { localStorage.setItem('kfn-sb', '0'); } catch (e) {} }
+        var g = b.parentNode, o = !g.classList.contains('open'); g.classList.toggle('open', o); b.setAttribute('aria-expanded', o);
+      });
+    });
+    var col = $('#sbcol'); if (col) col.addEventListener('click', function () { var m = document.documentElement.classList.toggle('sb-mini'); try { localStorage.setItem('kfn-sb', m ? '1' : '0'); } catch (e) {} });
+    var sb = $('#sb'), veil = $('#sbveil'), op = $('#sbopen');
+    function sbClose() { sb.classList.remove('open'); veil.classList.remove('open'); }
+    if (op) op.addEventListener('click', function () { sb.classList.add('open'); veil.classList.add('open'); });
+    if (veil) veil.addEventListener('click', sbClose);
+    var av = $('#avbtn'), avm = $('#avmenu');
+    if (av) { av.addEventListener('click', function (e) { e.stopPropagation(); avm.hidden = !avm.hidden; av.setAttribute('aria-expanded', !avm.hidden); });
+      document.addEventListener('click', function (e) { if (!e.target.closest('.tb-user')) avm.hidden = true; }); }
     // menu mobile
     var nav = $('.app-nav'), burger = $('.burger');
     if (burger) burger.addEventListener('click', function () { nav.classList.add('open'); });
@@ -295,10 +310,8 @@
       setInterval(function () {
         KFN.get('/gestion/api?a=notifs').then(function (n) {
           if (!n || n.error) return;
-          var br = $('#nbr'), bb = $('#nbb');
-          if (br) { br.textContent = n.rouge; br.parentNode.hidden = !n.rouge; }
-          if (bb) { bb.textContent = n.bleu; bb.parentNode.hidden = !n.bleu; }
-          var nv = $('.notif-btn .nb-vert'); if (nv) nv.hidden = !!(n.bleu || n.rouge);
+          var bell = $('#nbell');
+          if (bell) { bell.textContent = n.bleu + n.rouge; bell.hidden = !(n.bleu + n.rouge); bell.className = n.rouge ? 'r' : ''; }
           if (n.bleu > prev[0] && n.nouveaux.length) KFN.toast('✉ ' + n.nouveaux[0].titre, 'info');
           prev = [n.bleu, n.rouge];
         }).catch(function () {});
