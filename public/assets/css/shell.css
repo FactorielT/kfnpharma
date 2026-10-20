@@ -115,3 +115,5 @@ button.tb-role:hover{background:#E6F5EC}
 .rm-it.on .rm-radio{color:#fff;fill:#146C37;stroke:#fff}
 .rm-it em{font-style:normal;font-size:.8rem;font-weight:700;color:#146C37}
 @media (max-width:480px){.tb-roles{display:block}.tb-role{display:flex!important;padding:.3rem .5rem}.tb-role>div{display:none}.role-menu{left:auto;right:-60px}}
+.rm-note{margin:.6rem 1rem .4rem;font-size:.82rem;color:#6B7280;line-height:1.4}
+.rm-note a{color:#146C37;font-weight:700}

@@ -36,7 +36,7 @@ async function home(req, res) {
 <link rel="icon" href="/assets/img/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/css/site.css">
+<link rel="stylesheet" href="${C.asset('/assets/css/site.css')}">
 </head>
 <body>
 
@@ -244,7 +244,7 @@ async function home(req, res) {
 </div>
 
 ${!dbOk ? `<div class="db-warning">Base de données non connectée : vérifiez la configuration (.env).</div>` : ''}
-<script src="/assets/js/site.js"></script>
+<script src="${C.asset('/assets/js/site.js')}"></script>
 </body>
 </html>
 `);

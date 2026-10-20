@@ -144,9 +144,9 @@ async function layout(ctx, page, cur, content) {
 <meta name="theme-color" content="#14703A">
 <link rel="icon" href="/assets/img/logo.png"><link rel="manifest" href="/gestion/manifest.json">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/css/app.css"><link rel="stylesheet" href="/assets/css/shell.css">
+<link rel="stylesheet" href="${C.asset('/assets/css/app.css')}"><link rel="stylesheet" href="${C.asset('/assets/css/shell.css')}">
 <script>try{if(localStorage.getItem('kfn-sb')==='1')document.documentElement.classList.add('sb-mini')}catch(e){}</script>
-<script src="/assets/js/app.js"></script>
+<script src="${C.asset('/assets/js/app.js')}"></script>
 </head><body class="shell">
 <aside class="sb" id="sb" aria-label="Menu principal">
   <div class="sb-head"><a class="sb-logo" href="/gestion"><img src="/assets/img/logo.png" alt="KFN Pharma"></a>
@@ -161,12 +161,12 @@ async function layout(ctx, page, cur, content) {
     <div class="tb-date">${e(C.dateLongue())}</div>
     <div class="tb-right">
       <div class="tb-roles">
-        <button type="button" class="tb-role" id="rolebtn" aria-haspopup="true" aria-expanded="false" title="Travailler en tant que…">${ico(C.level(u) in ICO ? C.level(u) : 'gear')}<div><b>${e(C.NIVEAUX[C.level(u)] || C.level(u))}</b><small>${e(u.structures)}</small></div>${affs.length > 1 ? ico('chev', 'chev-d') : ''}</button>
+        <button type="button" class="tb-role" id="rolebtn" aria-haspopup="true" aria-expanded="false" title="Travailler en tant que…">${ico(C.level(u) in ICO ? C.level(u) : 'gear')}<div><b>${e(C.NIVEAUX[C.level(u)] || C.level(u))}</b><small>${e(u.structures)}</small></div>${ico('chev', 'chev-d')}</button>
         <div class="tb-menu role-menu" id="rolemenu" hidden><div class="rm-title">Travailler en tant que</div>
         ${Object.entries(affs.reduce((g, a) => ((g[a.structures] ||= []).push(a), g), {})).map(([ag, l]) => `<div class="rm-ag">${e(ag)}</div>${l.map(a => {
           const on = a.structures === u.structures && a.niveaudacces === C.level(u);
           return `<form method="post" action="/gestion/role" data-noconfirm><input type="hidden" name="_csrf" value="${s.csrf}"><button name="id" value="${a.idaffectation}" class="rm-it${on ? ' on' : ''}"${on ? ' disabled' : ''}>
-            ${ico(on ? 'ok' : 'no', 'rm-radio')}${ico(a.niveaudacces in ICO ? a.niveaudacces : 'gear')}<span>${e(C.NIVEAUX[a.niveaudacces] || a.niveaudacces)}</span>${on ? '<em>Actif</em>' : ''}</button></form>`; }).join('')}`).join('') || '<div class="rm-ag">Aucune autre affectation</div>'}
+            ${ico(on ? 'ok' : 'no', 'rm-radio')}${ico(a.niveaudacces in ICO ? a.niveaudacces : 'gear')}<span>${e(C.NIVEAUX[a.niveaudacces] || a.niveaudacces)}</span>${on ? '<em>Actif</em>' : ''}</button></form>`; }).join('')}`).join('')}${affs.length > 1 ? '' : `<p class="rm-note">Une seule affectation pour ce compte. Pour travailler dans d'autres agences ou avec d'autres profils, ajoutez des lignes dans <b>ADMIN → Utilisateurs</b>${C.isAdmin(u) ? ' (<a href="/gestion?p=utilisateurs">ouvrir</a>)' : ''}.</p>`}
         </div></div>
       <a class="tb-btn" href="/gestion/guide" target="_blank" rel="noopener">${ico('guide')}<span>Guide</span></a>
       ${nt ? `<a class="tb-bell" href="/gestion?p=notifications" title="Notifications des pré-commandes" aria-label="Notifications">${ico('notif')}<b id="nbell" class="${nt.rouge ? 'r' : ''}"${tot ? '' : ' hidden'}>${tot}</b></a>` : ''}

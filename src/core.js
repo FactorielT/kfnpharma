@@ -155,6 +155,18 @@ async function stockMove(ag, ref, delta, info = {}) {
            VALUES (?,?,?,?,?,?,?,?,?,?,1)`, [ref, i.libarticles || ref, delta, i.quantitealerte ?? 5, i.unitevaleur || 'Unité', ag, ag + ref, i.prixachat || 0, i.prixvente || 0, i.familearticle || '']);
 }
 
+/* Empreinte des fichiers CSS/JS : ajoutée aux liens (?v=…) pour que chaque mise à jour soit chargée
+   immédiatement par les navigateurs, sans vider le cache. */
+const ASSET_V = (() => {
+  const h = require('node:crypto').createHash('sha1');
+  for (const d of ['css', 'js']) {
+    const dir = path.join(__dirname, '..', 'public', 'assets', d);
+    try { for (const f of fs.readdirSync(dir).sort()) h.update(f).update(fs.readFileSync(path.join(dir, f))); } catch {}
+  }
+  return h.digest('hex').slice(0, 10);
+})();
+const asset = u => u + '?v=' + ASSET_V;
+
 let settingsCache = null, settingsAt = 0;
 async function settings() {
   if (!settingsCache || Date.now() - settingsAt > 60000) {
@@ -166,5 +178,5 @@ async function settings() {
 
 module.exports = {
   pool, q, rows, row, val, tx, initDb, e, money, qty, num, pad, today, nowTime, dfr, MOIS, moisFr, dateLongue, selOptions,
-  SIEGE, NIVEAUX, ROLES_PROFIL, level, isSuper, isAdmin, isSiegeUser, can, nextCounter, codeAgence, newNumero, stockRow, stockMove, settings,
+  SIEGE, NIVEAUX, ROLES_PROFIL, ASSET_V, asset, level, isSuper, isAdmin, isSiegeUser, can, nextCounter, codeAgence, newNumero, stockRow, stockMove, settings,
 };

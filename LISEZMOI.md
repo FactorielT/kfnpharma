@@ -10,6 +10,13 @@ Configuration ; chaque rubrique s'ouvre d'un clic ; le bouton rond réduit le me
 (profil et agence, bouton *Guide*, cloche des notifications, initiales de l'utilisateur avec *Se déconnecter*).
 Sur téléphone, le menu s'ouvre avec le bouton ☰.
 
+**Barre de progression** : après chaque enregistrement, modification ou suppression validé, une fenêtre « Validation achevée »
+affiche une barre pleine à 100 % qui régresse jusqu'à 0 % en 4 secondes puis se ferme ; souris sur la fenêtre : la
+progression s'arrête ; souris retirée : elle continue.
+
+**Mises à jour** : les fichiers CSS/JS sont versionnés (`app.js?v=…`) ; après chaque déploiement, les navigateurs
+chargent automatiquement la nouvelle version (voir MISE_A_JOUR.md pour la procédure Git + Render).
+
 **Plusieurs agences pour un même utilisateur** : dans *ADMIN → Utilisateurs*, un utilisateur reçoit une ou plusieurs
 **affectations** (agence + profil), dont une **principale**. Dans la barre du haut, un clic sur la pastille du profil ouvre
 « **Travailler en tant que** » : les affectations sont listées par agence, l'active est cochée et marquée *Actif* ;

@@ -21,7 +21,9 @@ const app = express();
 if (cfg.trustProxy) app.set('trust proxy', 1);
 app.disable('x-powered-by');
 app.use((req, res, next) => { res.set({ 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'SAMEORIGIN' }); next(); });
-app.use('/assets', express.static(path.join(__dirname, 'public', 'assets'), { maxAge: '7d' }));
+// Fichiers versionnés (?v=empreinte) : cache long ; sinon le navigateur revérifie à chaque fois (mise à jour immédiate)
+app.use('/assets', (req, res, next) => { res.locals.versionne = !!req.query.v; next(); },
+  express.static(path.join(__dirname, 'public', 'assets'), { cacheControl: false, setHeaders: (res) => res.setHeader('Cache-Control', res.locals.versionne ? 'public, max-age=31536000, immutable' : 'no-cache') }));
 app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 app.use(express.json({ limit: '5mb' }));
 app.use(session({
@@ -44,7 +46,7 @@ function loginPage(err = '', login = '', info = '') {
   return `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Authentification — KFN Pharma</title><meta name="theme-color" content="#1B4D24"><link rel="icon" href="/assets/img/logo.png">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/css/app.css"></head><body>
+<link rel="stylesheet" href="${C.asset('/assets/css/app.css')}"></head><body>
 <main class="login-page"><form class="login" method="post" action="/gestion/login" autocomplete="on">
   <img src="/assets/img/logo.png" alt="KFN Pharma"><h1>Authentification utilisateur</h1>
   <p class="sub">Utilisez vos paramètres de connexion pour vous identifier.</p>
