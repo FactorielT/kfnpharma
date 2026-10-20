@@ -10,6 +10,12 @@ Configuration ; chaque rubrique s'ouvre d'un clic ; le bouton rond réduit le me
 (profil et agence, bouton *Guide*, cloche des notifications, initiales de l'utilisateur avec *Se déconnecter*).
 Sur téléphone, le menu s'ouvre avec le bouton ☰.
 
+**Plusieurs agences pour un même utilisateur** : dans *ADMIN → Utilisateurs*, un utilisateur reçoit une ou plusieurs
+**affectations** (agence + profil), dont une **principale**. Dans la barre du haut, un clic sur la pastille du profil ouvre
+« **Travailler en tant que** » : les affectations sont listées par agence, l'active est cochée et marquée *Actif* ;
+un clic sur une autre affectation bascule immédiatement l'agence et le profil de travail (menus, droits, ventes et caisse
+de cette agence). À la connexion suivante, l'utilisateur retrouve sa dernière affectation active.
+
 **Connexion** : l'écran d'authentification s'affiche à chaque fois qu'on clique sur *Espace Connexion* depuis le site
 (une session encore ouverte est alors fermée). La session se ferme aussi à la fermeture du navigateur, après
 30 minutes sans activité (réglable avec `SESSION_IDLE_MINUTES`) et par *Se déconnecter* ; le bouton « Précédent »

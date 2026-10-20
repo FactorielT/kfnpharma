@@ -72,6 +72,50 @@
     return dialog({ alert: true, title: title || 'Information', msg: msg, icon: 'i', tone: 'b', buttons: [['OK', '1', 'green']] });
   };
 
+  /* ---------- Barre de progression (après une validation) ----------
+     KFN.loading(msg) : la barre se remplit pendant l'enregistrement.
+     KFN.success(msg) : la barre est pleine à 100 % puis régresse jusqu'à 0 % et la fenêtre se ferme
+                        (bouton OK pour fermer plus tôt). */
+  function progressBox(titre, msg) {
+    var m = document.createElement('div');
+    m.className = 'modal kp-modal';
+    m.innerHTML = '<div class="modal__box kp" role="status" aria-live="polite"><div class="kp__t"></div><p class="kp__m"></p>' +
+      '<div class="kp__bar" role="progressbar" aria-valuemin="0" aria-valuemax="100"><div class="kp__fill"></div><b class="kp__pct">0%</b></div><div class="kp__a"></div></div>';
+    m.querySelector('.kp__t').textContent = titre; m.querySelector('.kp__m').textContent = msg || '';
+    document.body.appendChild(m);
+    var fill = m.querySelector('.kp__fill'), pct = m.querySelector('.kp__pct'), bar = m.querySelector('.kp__bar');
+    return { el: m, set: function (v) { v = Math.max(0, Math.min(100, v)); fill.style.width = v + '%'; pct.textContent = Math.round(v) + '%'; pct.style.color = v >= 45 ? '#fff' : '#0B7D4B'; pct.style.textShadow = v >= 45 ? '' : 'none'; bar.setAttribute('aria-valuenow', Math.round(v)); },
+      close: function () { m.classList.add('kp-out'); setTimeout(function () { m.remove(); }, 250); } };
+  }
+  KFN.loading = function (msg) {
+    var p = progressBox('Validation en cours…', msg || 'Enregistrement des données, veuillez patienter.'), v = 0;
+    p.set(0);
+    var t = setInterval(function () { v += (96 - v) * 0.08; p.set(v); }, 80);      // se remplit vite puis ralentit vers 96 %
+    return { done: function () { clearInterval(t); p.set(100); setTimeout(p.close, 300); }, close: function () { clearInterval(t); p.close(); } };
+  };
+  KFN.success = function (msg, duree) {
+    return new Promise(function (resolve) {
+      // Pleine à 100 %, la barre régresse jusqu'à 0 % en 4 secondes puis la fenêtre se ferme.
+      // Souris sur la fenêtre : la progression s'arrête ; souris retirée : elle continue.
+      var p = progressBox('Validation achevée', msg || 'Enregistrement réussi.'), d = duree || 4000, ecoule = 0, last = null, pause = false, fini = false;
+      var box = p.el.querySelector('.kp');
+      p.set(100);
+      box.addEventListener('mouseenter', function () { pause = true; box.classList.add('kp-pause'); });
+      box.addEventListener('mouseleave', function () { pause = false; box.classList.remove('kp-pause'); last = null; });
+      function fin() { if (fini) return; fini = true; document.removeEventListener('keydown', key); p.close(); resolve(true); }
+      function key(e) { if (e.key === 'Escape') fin(); }
+      document.addEventListener('keydown', key);
+      function step(ts) {
+        if (fini) return;
+        if (!pause) { if (last !== null) ecoule += ts - last; last = ts; } else last = null;
+        var r = Math.min(1, ecoule / d);
+        p.set(100 * (1 - r));
+        if (r < 1) requestAnimationFrame(step); else setTimeout(fin, 120);
+      }
+      requestAnimationFrame(step);
+    });
+  };
+
   /* ---------- Détail d'une ligne d'état (facture, client, produit, appro) ---------- */
   KFN.details = function (qs) {
     var m = document.createElement('div'); m.className = 'modal';
@@ -236,6 +280,9 @@
     function sbClose() { sb.classList.remove('open'); veil.classList.remove('open'); }
     if (op) op.addEventListener('click', function () { sb.classList.add('open'); veil.classList.add('open'); });
     if (veil) veil.addEventListener('click', sbClose);
+    var rb = $('#rolebtn'), rm = $('#rolemenu');
+    if (rb) { rb.addEventListener('click', function (e) { e.stopPropagation(); rm.hidden = !rm.hidden; rb.setAttribute('aria-expanded', !rm.hidden); });
+      document.addEventListener('click', function (e) { if (!e.target.closest('.tb-roles')) rm.hidden = true; }); }
     var av = $('#avbtn'), avm = $('#avmenu');
     if (av) { av.addEventListener('click', function (e) { e.stopPropagation(); avm.hidden = !avm.hidden; av.setAttribute('aria-expanded', !avm.hidden); });
       document.addEventListener('click', function (e) { if (!e.target.closest('.tb-user')) avm.hidden = true; }); }
@@ -280,7 +327,7 @@
     });
     // Confirmation avant chaque enregistrement + un seul envoi
     $$('form').forEach(function (f) {
-      if ((f.getAttribute('method') || 'get').toLowerCase() !== 'post') return;
+      if ((f.getAttribute('method') || 'get').toLowerCase() !== 'post' || f.hasAttribute('data-noconfirm')) return;
       f.addEventListener('submit', function (e) {
         if (e.defaultPrevented) return;
         if (f.dataset.ok) {
@@ -299,6 +346,7 @@
           if (!k) { k = document.createElement('input'); k.type = 'hidden'; k.name = '_kind'; f.appendChild(k); }
           k.value = kind;
           f.dataset.ok = 1;
+          KFN.loading();       // barre de progression pendant l'enregistrement (la page suivante affiche la fin)
           if (f.requestSubmit) f.requestSubmit(sub && sub.form === f ? sub : undefined); else f.submit();
         });
       });

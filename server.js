@@ -79,6 +79,10 @@ app.post('/gestion/login', wrap(async (req, res) => {
     if (ok && !u.actif_life) return res.type('html').send(loginPage('Ce compte est désactivé. Contactez l’administrateur.', login));
     if (!ok) { s.tries++; s.tryAt = Date.now(); return res.type('html').send(loginPage('Login ou mot de passe incorrect.', login)); }
     delete u.mot_de_passe;
+    // Agence et profil de travail : le dernier utilisé s'il est toujours affecté, sinon l'affectation principale
+    const affs = await C.rows('SELECT * FROM t_affectation WHERE idutilisateurs = ? ORDER BY principale DESC, idaffectation', [u.idutilisateurs]);
+    if (affs.length && !affs.some(a => a.structures === u.structures && a.niveaudacces === C.level(u))) { u.structures = affs[0].structures; u.niveaudacces = affs[0].niveaudacces; }
+    if (!affs.length && !C.isSuper(u)) return res.type('html').send(loginPage("Aucune agence n'est attribuée à ce compte. Contactez l’administrateur.", login));
     req.session.regenerate(err => {
       if (err) return res.type('html').send(loginPage('Erreur de session, réessayez.'));
       req.session.user = u; req.session.lastSeen = Date.now();
@@ -94,6 +98,20 @@ app.get('/gestion/guide', (req, res) => {
   if (fs.existsSync(pdf)) return res.type('pdf').sendFile(pdf);
   res.type('text/plain; charset=utf-8').send(fs.existsSync(path.join(__dirname, 'LISEZMOI.md')) ? fs.readFileSync(path.join(__dirname, 'LISEZMOI.md'), 'utf8') : 'Guide indisponible.');
 });
+/* « Travailler en tant que » : changer d'agence / de profil parmi ses affectations */
+app.post('/gestion/role', requireLogin, wrap(async (req, res) => {
+  if (!csrfOk(req)) return res.status(419).send('Session expirée. Rechargez la page et recommencez.');
+  const u = req.session.user;
+  const a = await C.row('SELECT * FROM t_affectation WHERE idaffectation = ? AND idutilisateurs = ?', [Number(req.body.id), u.idutilisateurs]);
+  const s = req.session; s.flash ||= [];
+  if (!a || !Number(await C.val('SELECT COUNT(*) FROM t_structure WHERE nom_structure = ?', [a.structures]))) s.flash.push(['err', 'Affectation introuvable.']);
+  else {
+    u.structures = a.structures; u.niveaudacces = a.niveaudacces;
+    await C.q('UPDATE utilisateurs SET structures = ?, niveaudacces = ?, groupe = ? WHERE idutilisateurs = ?', [a.structures, a.niveaudacces, C.NIVEAUX[a.niveaudacces] || '', u.idutilisateurs]);
+    s.flash.push(['ok', `Vous travaillez maintenant en tant que ${C.NIVEAUX[a.niveaudacces] || a.niveaudacces} — ${a.structures}.`]);
+  }
+  s.save(() => res.redirect('/gestion'));
+}));
 app.get('/gestion/manifest.json', (req, res) => res.json({ name: 'KFN Pharma Gestion', short_name: 'KFN Gestion', start_url: '/gestion', display: 'standalone', background_color: '#EFF5F1', theme_color: '#E07F16', icons: [{ src: '/assets/img/logo.png', sizes: '243x121', type: 'image/png' }] }));
 
 /* ---------- Application (connexion obligatoire) ---------- */

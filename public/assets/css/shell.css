@@ -97,3 +97,21 @@ html.sb-mini .sb-nav{padding:.4rem .6rem}
 }
 @media (max-width:480px){.tb-role{display:none}.tb-btn{padding:.5rem}}
 @media print{.sb,.tb,.shell-foot,.sb-veil{display:none!important}body.shell{display:block;background:#fff}.shell .main{padding:0}}
+
+/* « Travailler en tant que » */
+.tb-roles{position:relative}
+button.tb-role{cursor:pointer;font:inherit;text-align:left}
+button.tb-role:hover{background:#E6F5EC}
+.tb-role .chev-d{width:15px;height:15px;transform:rotate(90deg);color:#6B7280}
+.role-menu{right:auto;left:0;min-width:280px;padding:.5rem 0;max-height:70vh;overflow:auto}
+.rm-title{padding:.4rem 1rem .2rem;font:700 .74rem var(--font);letter-spacing:.06em;text-transform:uppercase;color:#6B7280}
+.rm-ag{padding:.7rem 1rem .3rem;font:700 .82rem var(--font);color:#1f2937;text-transform:uppercase}
+.role-menu form{margin:0}
+.rm-it{display:flex;align-items:center;gap:.7rem;width:100%;padding:.6rem 1rem;border:0;background:none;cursor:pointer;font:500 .95rem var(--font);color:#374151;text-align:left}
+.rm-it:hover{background:#F3F4F6}
+.rm-it span{flex:1}
+.rm-it .rm-radio{color:#9CA3AF}
+.rm-it.on{background:#E9F7EF;color:#146C37;font-weight:700;cursor:default}
+.rm-it.on .rm-radio{color:#fff;fill:#146C37;stroke:#fff}
+.rm-it em{font-style:normal;font-size:.8rem;font-weight:700;color:#146C37}
+@media (max-width:480px){.tb-roles{display:block}.tb-role{display:flex!important;padding:.3rem .5rem}.tb-role>div{display:none}.role-menu{left:auto;right:-60px}}

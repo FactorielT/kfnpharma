@@ -6,7 +6,7 @@ module.exports = async ctx => {
     factures: Number(await C.val('SELECT COUNT(*) FROM t_commande WHERE structures = ? OR (structures = ? AND nomprenom = ?)', [nom, C.SIEGE, nom])),
     stock: Number(await C.val('SELECT COUNT(*) FROM t_stock WHERE structures = ?', [nom])),
     appros: Number(await C.val('SELECT COUNT(*) FROM t_precommandeagence WHERE structures = ?', [nom])) + Number(await C.val('SELECT COUNT(*) FROM t_appro WHERE structures = ?', [nom])),
-    users: Number(await C.val('SELECT COUNT(*) FROM utilisateurs WHERE structures = ?', [nom])),
+    users: Number(await C.val('SELECT COUNT(DISTINCT idutilisateurs) FROM t_affectation WHERE structures = ?', [nom])),
   });
   if (ctx.req.method === 'POST') {
     if (ctx.post('del')) {

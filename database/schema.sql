@@ -631,3 +631,14 @@ CREATE INDEX IF NOT EXISTS idx_inv_num ON t_inventaire (numinventaire);
 -- Versements des agences au siège : lien versement -> paiements des factures
 ALTER TABLE t_paiement_sl ADD COLUMN IF NOT EXISTS idversement BIGINT;
 ALTER TABLE t_compteagence ADD COLUMN IF NOT EXISTS factures TEXT;
+
+-- Affectations : un utilisateur peut travailler dans une ou plusieurs agences, avec un profil par agence
+CREATE TABLE IF NOT EXISTS t_affectation (
+  idaffectation  BIGSERIAL PRIMARY KEY,
+  idutilisateurs BIGINT NOT NULL,
+  structures     VARCHAR(50) NOT NULL,
+  niveaudacces   VARCHAR(4) NOT NULL,
+  principale     SMALLINT DEFAULT 0,
+  CONSTRAINT uq_affectation UNIQUE (idutilisateurs, structures, niveaudacces)
+);
+CREATE INDEX IF NOT EXISTS idx_aff_user ON t_affectation (idutilisateurs);

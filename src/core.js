@@ -56,6 +56,18 @@ CREATE TABLE IF NOT EXISTS t_notification (idnotification BIGSERIAL PRIMARY KEY,
 CREATE INDEX IF NOT EXISTS idx_notif_date ON t_notification (datecreation);
 ALTER TABLE t_inventaire ADD COLUMN IF NOT EXISTS numinventaire VARCHAR(40);
 ALTER TABLE t_paiement_sl ADD COLUMN IF NOT EXISTS idversement BIGINT;
+CREATE TABLE IF NOT EXISTS t_affectation (
+  idaffectation  BIGSERIAL PRIMARY KEY,
+  idutilisateurs BIGINT NOT NULL,
+  structures     VARCHAR(50) NOT NULL,
+  niveaudacces   VARCHAR(4) NOT NULL,
+  principale     SMALLINT DEFAULT 0,
+  CONSTRAINT uq_affectation UNIQUE (idutilisateurs, structures, niveaudacces)
+);
+CREATE INDEX IF NOT EXISTS idx_aff_user ON t_affectation (idutilisateurs);
+INSERT INTO t_affectation (idutilisateurs, structures, niveaudacces, principale)
+  SELECT u.idutilisateurs, u.structures, CASE WHEN u.niveaudacces = 'GSS' THEN 'GST' ELSE u.niveaudacces END, 1 FROM utilisateurs u
+  WHERE u.structures IS NOT NULL AND u.niveaudacces IS NOT NULL AND NOT EXISTS (SELECT 1 FROM t_affectation a WHERE a.idutilisateurs = u.idutilisateurs);
 ALTER TABLE t_compteagence ADD COLUMN IF NOT EXISTS factures TEXT;
 ALTER TABLE t_inventaire ADD COLUMN IF NOT EXISTS datedebut DATE;
 CREATE INDEX IF NOT EXISTS idx_inv_num ON t_inventaire (numinventaire);

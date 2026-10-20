@@ -105,7 +105,15 @@ const ICO = {
   admin: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 7 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.6 1.6 0 0 0 3.5 14H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 7a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.6 1.6 0 0 0 10 3.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/>',
   chev: '<path d="m9 6 6 6-6 6"/>', guide: '<path d="M4 4h6a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H4zM20 4h-6a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h6z"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
-  out: '<path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l5-5-5-5M15 12H3"/>', menu: '<path d="M4 6h16M4 12h16M4 18h16"/>', col: '<circle cx="12" cy="12" r="9"/><path d="m14 9-3 3 3 3"/>',
+  out: '<path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l5-5-5-5M15 12H3"/>',
+  SUP: '<path d="M12 3 4 6v6c0 5 3.4 8 8 9 4.6-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/>',
+  ADM: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
+  RAG: '<circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M16 11l2 2 4-4"/>',
+  GST: '<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
+  CAI: '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M16 15h2"/>',
+  VEN: '<path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6"/><circle cx="10" cy="20" r="1.3"/><circle cx="17" cy="20" r="1.3"/>',
+  CON: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  ok: '<circle cx="12" cy="12" r="10"/><path d="m8 12 3 3 5-6"/>', no: '<circle cx="12" cy="12" r="9"/>', menu: '<path d="M4 6h16M4 12h16M4 18h16"/>', col: '<circle cx="12" cy="12" r="9"/><path d="m14 9-3 3 3 3"/>',
 };
 const ico = (k, cls = '') => `<svg class="ico ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICO[k] || ICO.etats}</svg>`;
 const SECTION = { siege: ['Siège', 'Agence Siège'], stocks: ['Stocks', 'Gestion de stocks'], ventes: ['Ventes', 'Ventes articles'], caisse: ['Caisse', 'Paiement caisse'], etats: ['Éditions', 'Éditions des états'], admin: ['Configuration', 'Administration'] };
@@ -125,6 +133,7 @@ async function layout(ctx, page, cur, content) {
     side += `<div class="sb-sec">${e(sec)}</div><div class="sb-grp${act ? ' open' : ''}"><button type="button" class="sb-link sb-tog" aria-expanded="${act}" title="${e(lab)}">${ico(m.key)}<span>${e(lab)}</span>${ico('chev', 'chev')}</button>
       <div class="sb-sub">${it.map(([k, l]) => `<a href="/gestion?p=${e(k)}"${k === cur ? ' class="on"' : ''}>${e(l)}</a>`).join('')}</div></div>`;
   }
+  const affs = await C.rows('SELECT * FROM t_affectation WHERE idutilisateurs = ? ORDER BY structures <> ?, structures, niveaudacces', [u.idutilisateurs, C.SIEGE]).catch(() => []);
   const ini = String(u.nom_prenoms || u.login || '?').trim().split(/\s+/).map(x => x[0]).slice(0, 2).join('').toUpperCase();
   const tot = nt ? nt.bleu + nt.rouge : 0;
   return `<!DOCTYPE html>
@@ -151,7 +160,14 @@ async function layout(ctx, page, cur, content) {
     <button type="button" class="tb-burger" id="sbopen" aria-label="Ouvrir le menu">${ico('menu')}</button>
     <div class="tb-date">${e(C.dateLongue())}</div>
     <div class="tb-right">
-      <div class="tb-role" title="Profil et agence">${ico('gear')}<div><b>${e(C.NIVEAUX[C.level(u)] || C.level(u))}</b><small>${e(u.structures)}</small></div></div>
+      <div class="tb-roles">
+        <button type="button" class="tb-role" id="rolebtn" aria-haspopup="true" aria-expanded="false" title="Travailler en tant que…">${ico(C.level(u) in ICO ? C.level(u) : 'gear')}<div><b>${e(C.NIVEAUX[C.level(u)] || C.level(u))}</b><small>${e(u.structures)}</small></div>${affs.length > 1 ? ico('chev', 'chev-d') : ''}</button>
+        <div class="tb-menu role-menu" id="rolemenu" hidden><div class="rm-title">Travailler en tant que</div>
+        ${Object.entries(affs.reduce((g, a) => ((g[a.structures] ||= []).push(a), g), {})).map(([ag, l]) => `<div class="rm-ag">${e(ag)}</div>${l.map(a => {
+          const on = a.structures === u.structures && a.niveaudacces === C.level(u);
+          return `<form method="post" action="/gestion/role" data-noconfirm><input type="hidden" name="_csrf" value="${s.csrf}"><button name="id" value="${a.idaffectation}" class="rm-it${on ? ' on' : ''}"${on ? ' disabled' : ''}>
+            ${ico(on ? 'ok' : 'no', 'rm-radio')}${ico(a.niveaudacces in ICO ? a.niveaudacces : 'gear')}<span>${e(C.NIVEAUX[a.niveaudacces] || a.niveaudacces)}</span>${on ? '<em>Actif</em>' : ''}</button></form>`; }).join('')}`).join('') || '<div class="rm-ag">Aucune autre affectation</div>'}
+        </div></div>
       <a class="tb-btn" href="/gestion/guide" target="_blank" rel="noopener">${ico('guide')}<span>Guide</span></a>
       ${nt ? `<a class="tb-bell" href="/gestion?p=notifications" title="Notifications des pré-commandes" aria-label="Notifications">${ico('notif')}<b id="nbell" class="${nt.rouge ? 'r' : ''}"${tot ? '' : ' hidden'}>${tot}</b></a>` : ''}
       <div class="tb-user"><button type="button" class="tb-av" id="avbtn" aria-haspopup="true" aria-expanded="false" title="${e(u.nom_prenoms)}">${e(ini)}<i></i></button>
@@ -161,7 +177,7 @@ async function layout(ctx, page, cur, content) {
   </header>
   <main class="main"${nt ? ` data-notif="${nt.bleu},${nt.rouge}"` : ''}>
 ${fl.filter(f => f[0] !== 'dialog').map(([t, m]) => `<div class="flash ${e(t)}">${e(m)}</div>`).join('')}
-${dialogs.length ? `<script>document.addEventListener('DOMContentLoaded',function(){KFN.alert(${JSON.stringify(dialogs.join('\n'))});});</script>` : ''}
+${dialogs.length ? `<script>document.addEventListener('DOMContentLoaded',function(){KFN.success(${JSON.stringify(dialogs.join('\n'))});});</script>` : ''}
 ${content}
   </main>
   <footer class="shell-foot">© ${new Date().getFullYear()} KFN PHARMA — ${e(cfg.appTitle)}</footer>

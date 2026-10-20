@@ -133,3 +133,6 @@ INSERT INTO Objectif (annee, MONTANT, Structures, Structuresannee) VALUES
 INSERT INTO t_parametres (cle, valeur) VALUES
 ('wa_fournisseur','aucun'), ('wa_evt_precommande','1'), ('wa_evt_validation','1'), ('wa_evt_reception','1'), ('wa_siege_numeros','')
 ON CONFLICT (cle) DO NOTHING;
+
+-- Affectations des comptes de départ
+INSERT INTO t_affectation (idutilisateurs, structures, niveaudacces, principale) SELECT idutilisateurs, structures, niveaudacces, 1 FROM utilisateurs ON CONFLICT DO NOTHING;
